@@ -1,0 +1,66 @@
+#
+# Set minimum required version
+#
+cmake_minimum_required(VERSION 2.8.12)
+
+#
+# Find pkg-config
+#
+find_package(PkgConfig REQUIRED)
+
+#
+# Look for the optional ARGoS package
+#
+pkg_check_modules(ARGOS argos3_simulator)
+if(ARGOS_FOUND)
+  include_directories(${ARGOS_INCLUDE_DIRS})
+  link_directories(${ARGOS_LIBRARY_DIRS})
+  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${ARGOS_PREFIX}/share/argos3/cmake)
+  include(ARGoSCheckQTOpenGL)
+  # Look for Lua52
+  find_package(Lua52 REQUIRED)
+  include_directories(${LUA_INCLUDE_DIR})
+endif(ARGOS_FOUND)
+
+#
+# Find dependancies
+#
+# Find GTSAM
+find_package(GTSAM REQUIRED)
+include_directories(${GTSAM_INCLUDE_DIR})
+link_directories(${GTSAM_LIBRARY_DIRS})
+message("GTSAM Libraries: ${GTSAM_LIBRARIES}")
+# for unittest examples
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${GTSAM_DIR}/../GTSAMCMakeTools")
+include(GtsamTesting)
+# Find Boost
+find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
+include_directories(${Boost_INCLUDE_DIRS})
+link_libraries(${Boost_LIBRARIES})
+message("Boost Libraries: ${Boost_LIBRARIES}")
+
+#
+# Compile libbuzzargos
+#
+link_directories(/usr/lib/argos3/)
+set(ARGOS_BUZZ_SOURCES
+  buzz/argos/buzz_controller_quadmapper.h      
+  buzz/argos/buzz_controller_quadmapper.cpp
+  buzz/argos/buzz_controller_quadmapper_no_sensing.h      
+  buzz/argos/buzz_controller_quadmapper_no_sensing.cpp)
+
+add_library(argos3plugin_simulator_buzz_slam SHARED ${ARGOS_BUZZ_SOURCES})
+target_link_libraries(argos3plugin_simulator_buzz_slam
+  argos3core_simulator
+  argos3plugin_simulator_genericrobot
+  argos3plugin_simulator_footbot
+  argos3plugin_simulator_spiri
+  argos3plugin_simulator_buzz
+  buzz
+  gtsam
+  )
+
+set_target_properties(argos3plugin_simulator_buzz_slam PROPERTIES LINKER_LANGUAGE CXX)
+
+install(TARGETS argos3plugin_simulator_buzz_slam LIBRARY DESTINATION /usr/lib/argos3)
+install(DIRECTORY . DESTINATION include/buzz/argos FILES_MATCHING PATTERN "*.h")

@@ -1,0 +1,42 @@
+#ifndef BUZZ_CONTROLLER_QUADMAPPER_NO_SENSING_H
+#define BUZZ_CONTROLLER_QUADMAPPER_NO_SENSING_H
+
+#include <buzz/argos/buzz_controller_quadmapper.h>
+#include <map>
+
+using namespace argos;
+
+class CBuzzControllerQuadMapperNoSensing : public CBuzzControllerQuadMapper {
+
+public:
+
+   CBuzzControllerQuadMapperNoSensing();
+   
+   virtual ~CBuzzControllerQuadMapperNoSensing();
+
+   virtual void Init(TConfigurationNode& t_node);
+
+   int MoveForwardFakeOdometry(const CVector3& distance, const uint16_t& robot_id);
+
+   void ComputeNoisyFakeLoopClosureMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
+                                          const int& pose_id, const int& robot_id, const int& this_robot_pose_id);
+
+private:
+
+   void ComputeNoisyFakeOdometryMeasurement(const CQuaternion& current_orientation, const CVector3& translation);
+
+   gtsam::Pose3 AddGaussianNoiseToMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t);
+
+   void SavePoseGroundTruth();
+
+protected:
+
+   virtual buzzvm_state RegisterFunctions();
+
+private:
+
+   std::map<int, gtsam::Pose3> ground_truth_poses_;
+
+};
+
+#endif
