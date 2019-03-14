@@ -2,6 +2,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
+#include <cmath> 
 
 /****************************************/
 /****************************************/
@@ -21,6 +22,22 @@ CBuzzControllerQuadMapperNoSensing::~CBuzzControllerQuadMapperNoSensing() {
 
 void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    CBuzzControllerQuadMapper::Init(t_node);
+
+   // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
+   sensor_range_ = 15;
+   outlier_probability_ = 0.1;
+   number_of_outliers_added_ = 0;
+
+   // Initialize random numbers generators
+   srand(time(NULL));
+   gen_translation_ = std::mt19937{rd_()};
+   gen_rotation_ = std::mt19937{rd_()};
+   gen_outliers_ = std::mt19937{rd_()};
+   normal_distribution_translation_ = std::normal_distribution<>{0, translation_noise_std_};
+   normal_distribution_rotation_ = std::normal_distribution<>{0, rotation_noise_std_};
+   uniform_distribution_outliers_translation_ = std::uniform_real_distribution<>{0, sensor_range_};
+   uniform_distribution_outliers_rotation_ = std::uniform_real_distribution<>{-M_PI, M_PI};
+   uniform_distribution_draw_outlier_ = std::uniform_real_distribution<>{0, 1};
 
    // Save ground truth for fake loop closure creation
    SavePoseGroundTruth();
@@ -224,6 +241,28 @@ gtsam::Pose3 CBuzzControllerQuadMapperNoSensing::AddGaussianNoiseToMeasurement(c
 /****************************************/
 /****************************************/
 
+gtsam::Pose3 CBuzzControllerQuadMapperNoSensing::OutlierMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t) {
+   
+   // TODO: Add option to add noise greater than 3 or 5 sigmas, instead of totally random measurment
+   // This is why this method takes the measurment in parameter.
+   gtsam::Point3 t_outlier = {   uniform_distribution_outliers_translation_(gen_outliers_),  
+                                 uniform_distribution_outliers_translation_(gen_outliers_),
+                                 uniform_distribution_outliers_translation_(gen_outliers_) };
+
+
+   gtsam::Rot3 R_outlier = gtsam::Rot3::Ypr( uniform_distribution_outliers_rotation_(gen_outliers_), 
+                                             uniform_distribution_outliers_rotation_(gen_outliers_),
+                                             uniform_distribution_outliers_rotation_(gen_outliers_));
+
+   number_of_outliers_added_++;
+   std::cout << "Number of outliers added : " << number_of_outliers_added_ << std::endl;
+
+   return gtsam::Pose3(R_outlier, t_outlier);
+}
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
                                                                const int& other_robot_pose_id, const int& other_robot_id, const int& this_robot_pose_id) {
    // Loop closure symbols
@@ -247,8 +286,13 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(
                        gt_translation.GetZ() - this_robot_pose.translation().z() };
    t = this_robot_pose.rotation().inverse() * t;
 
-   // Add gaussian noise
-   auto measurement = AddGaussianNoiseToMeasurement(R, t);
+   // Add gaussian noise or make it an outlier
+   gtsam::Pose3 measurement;
+   if ( uniform_distribution_draw_outlier_(gen_outliers_) < outlier_probability_) {
+      measurement = OutlierMeasurement(R, t);
+   } else {
+      measurement = AddGaussianNoiseToMeasurement(R, t);
+   }
 
    // Isotropic noise model
    Eigen::VectorXd sigmas(6);

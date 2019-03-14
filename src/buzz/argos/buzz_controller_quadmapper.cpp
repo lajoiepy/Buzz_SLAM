@@ -22,16 +22,9 @@ CBuzzControllerQuadMapper::~CBuzzControllerQuadMapper() {
 void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    CBuzzControllerSpiri::Init(t_node);
 
-   // Initialize constant attributes // TODO: add paramaters for them
+   // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
    rotation_noise_std_ = 0.01;
    translation_noise_std_ = 0.1;
-
-   // Initialize random numbers generators
-   srand(time(NULL));
-   gen_translation_ = std::mt19937{rd_()};
-   gen_rotation_ = std::mt19937{rd_()};
-   normal_distribution_translation_ = std::normal_distribution<>{0, translation_noise_std_};
-   normal_distribution_rotation_ = std::normal_distribution<>{0, rotation_noise_std_};
 
    // Initialize attributes
    previous_orientation_ = CQuaternion();

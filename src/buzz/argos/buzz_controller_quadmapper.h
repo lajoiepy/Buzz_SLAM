@@ -68,10 +68,6 @@ protected:
    int number_of_poses_;
    unsigned char robot_id_char_;
 
-   std::random_device rd_{};
-   std::mt19937 gen_translation_, gen_rotation_;
-   std::normal_distribution<> normal_distribution_translation_, normal_distribution_rotation_;
-
    double rotation_noise_std_, translation_noise_std_;
 
 };
