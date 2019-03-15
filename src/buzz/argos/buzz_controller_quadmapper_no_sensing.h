@@ -18,7 +18,7 @@ public:
 
    int MoveForwardFakeOdometry(const CVector3& distance, const uint16_t& robot_id);
 
-   void ComputeNoisyFakeLoopClosureMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
+   int ComputeNoisyFakeLoopClosureMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
                                           const int& pose_id, const int& robot_id, const int& this_robot_pose_id);
 
 private:

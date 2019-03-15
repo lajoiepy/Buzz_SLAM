@@ -98,8 +98,10 @@ static int BuzzComputeFakeRendezVousLoopClosures(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapperNoSensing*>(buzzvm_stack_at(vm, 1)->u.value)->ComputeNoisyFakeLoopClosureMeasurement(gt_orientation, gt_translation, other_robot_pose_id, other_robot_id, this_robot_pose_id);
-   return buzzvm_ret0(vm);
+   int is_outlier = reinterpret_cast<CBuzzControllerQuadMapperNoSensing*>(buzzvm_stack_at(vm, 1)->u.value)->ComputeNoisyFakeLoopClosureMeasurement(gt_orientation, gt_translation, other_robot_pose_id, other_robot_id, this_robot_pose_id);
+   buzzvm_pushi(vm, is_outlier);
+
+   return buzzvm_ret1(vm);
 }
 
 /****************************************/
@@ -255,7 +257,6 @@ gtsam::Pose3 CBuzzControllerQuadMapperNoSensing::OutlierMeasurement(const gtsam:
                                              uniform_distribution_outliers_rotation_(gen_outliers_));
 
    number_of_outliers_added_++;
-   std::cout << "Number of outliers added : " << number_of_outliers_added_ << std::endl;
 
    return gtsam::Pose3(R_outlier, t_outlier);
 }
@@ -263,7 +264,7 @@ gtsam::Pose3 CBuzzControllerQuadMapperNoSensing::OutlierMeasurement(const gtsam:
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
+int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
                                                                const int& other_robot_pose_id, const int& other_robot_id, const int& this_robot_pose_id) {
    // Loop closure symbols
    gtsam::Symbol this_robot_symbol = gtsam::Symbol(robot_id_char_, this_robot_pose_id);
@@ -288,8 +289,10 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(
 
    // Add gaussian noise or make it an outlier
    gtsam::Pose3 measurement;
+   int is_outlier = 0;
    if ( uniform_distribution_draw_outlier_(gen_outliers_) < outlier_probability_) {
       measurement = OutlierMeasurement(R, t);
+      is_outlier = 1;
    } else {
       measurement = AddGaussianNoiseToMeasurement(R, t);
    }
@@ -336,6 +339,8 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(
 
    // Add new factor to local pose graph
    local_pose_graph_.push_back(new_factor);
+
+   return is_outlier;
 }
 
 /****************************************/
