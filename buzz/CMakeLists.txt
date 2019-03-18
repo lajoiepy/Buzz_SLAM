@@ -33,6 +33,7 @@ message("GTSAM Libraries: ${GTSAM_LIBRARIES}")
 # for unittest examples
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${GTSAM_DIR}/../GTSAMCMakeTools")
 include(GtsamTesting)
+
 # Find Boost
 find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
@@ -40,14 +41,14 @@ link_libraries(${Boost_LIBRARIES})
 message("Boost Libraries: ${Boost_LIBRARIES}")
 
 #
-# Compile libbuzzargos
+# Compile buzz slam library
 #
 link_directories(/usr/lib/argos3/)
 set(ARGOS_BUZZ_SOURCES
-  buzz/argos/buzz_controller_quadmapper.h      
-  buzz/argos/buzz_controller_quadmapper.cpp
-  buzz/argos/buzz_controller_quadmapper_no_sensing.h      
-  buzz/argos/buzz_controller_quadmapper_no_sensing.cpp)
+  argos/buzz_controller_quadmapper.h      
+  argos/buzz_controller_quadmapper.cpp
+  argos/buzz_controller_quadmapper_no_sensing.h      
+  argos/buzz_controller_quadmapper_no_sensing.cpp)
 
 add_library(argos3plugin_simulator_buzz_slam SHARED ${ARGOS_BUZZ_SOURCES})
 target_link_libraries(argos3plugin_simulator_buzz_slam
@@ -58,6 +59,7 @@ target_link_libraries(argos3plugin_simulator_buzz_slam
   argos3plugin_simulator_buzz
   buzz
   gtsam
+  distributed_mapper
   )
 
 set_target_properties(argos3plugin_simulator_buzz_slam PROPERTIES LINKER_LANGUAGE CXX)

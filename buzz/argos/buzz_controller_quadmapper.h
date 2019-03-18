@@ -13,6 +13,7 @@
 #include <boost/make_shared.hpp>
 #include <random>
 #include <cmath>
+#include <distributed_mapper/distributed_mapper.h>
 
 using namespace argos;
 
@@ -58,17 +59,40 @@ protected:
 
    void WriteDataset(const uint16_t& robot_id);
 
+   // Wrapper function related to distributed_mapper
+   void InitOptimizer();
+
+   void OptimizePoseGraph();
+
+   void UpdateOptimizer();
+
+   void OutliersFiltering();
+
 protected:
 
-   gtsam::NonlinearFactorGraph local_pose_graph_;
-   gtsam::Values poses_initial_guess_;
+   boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_;
+
+   boost::shared_ptr<gtsam::Values> poses_initial_guess_;
+
+   gtsam::GraphAndValues graph_and_values_;
+
    CQuaternion previous_orientation_;
+
    gtsam::Symbol previous_symbol_;
+
    gtsam::Pose3 previous_pose_;
+
    int number_of_poses_;
+
    unsigned char robot_id_char_;
 
+   boost::shared_ptr<distributed_mapper::DistributedMapper> optimizer_;
+
    double rotation_noise_std_, translation_noise_std_;
+
+   gtsam::SharedNoiseModel noise_model_;
+
+   bool disconnected_graph_;
 
 };
 

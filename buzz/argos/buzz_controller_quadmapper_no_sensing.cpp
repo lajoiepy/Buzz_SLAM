@@ -196,14 +196,8 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement(con
    // Add gaussian noise
    auto measurement = AddGaussianNoiseToMeasurement(R, t);
 
-   // Isotropic noise model
-   Eigen::VectorXd sigmas(6);
-   sigmas << rotation_noise_std_, rotation_noise_std_, rotation_noise_std_, 
-            translation_noise_std_, translation_noise_std_, translation_noise_std_;
-   gtsam::SharedNoiseModel noise_model = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
-
    // Initialize factor
-   gtsam::BetweenFactor<gtsam::Pose3> new_factor(previous_symbol_, current_symbol_, measurement, noise_model);
+   gtsam::BetweenFactor<gtsam::Pose3> new_factor(previous_symbol_, current_symbol_, measurement, noise_model_);
 
    // Update attributes value
    previous_orientation_ = m_pcPos->GetReading().Orientation;
@@ -211,10 +205,12 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement(con
    previous_symbol_ = current_symbol_;
 
    // Add new factor to local pose graph
-   local_pose_graph_.push_back(new_factor);
+   local_pose_graph_->push_back(new_factor);
 
    // Add new pose estimate into initial guess
-   poses_initial_guess_.insert(previous_symbol_.key(), previous_pose_);
+   poses_initial_guess_->insert(previous_symbol_.key(), previous_pose_);
+
+   UpdateOptimizer();
 
    // Save ground truth for fake loop closure creation
    SavePoseGroundTruth();
@@ -297,17 +293,11 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(c
       measurement = AddGaussianNoiseToMeasurement(R, t);
    }
 
-   // Isotropic noise model
-   Eigen::VectorXd sigmas(6);
-   sigmas << rotation_noise_std_, rotation_noise_std_, rotation_noise_std_, 
-            translation_noise_std_, translation_noise_std_, translation_noise_std_;
-   gtsam::SharedNoiseModel noise_model = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
-
    // Initialize factor
    // Enforce an order for loop closure measurement. (lower_id, higher_id).
    gtsam::BetweenFactor<gtsam::Pose3> new_factor;
    if (other_robot_symbol.chr() > this_robot_symbol.chr()) {
-      new_factor = gtsam::BetweenFactor<gtsam::Pose3>(this_robot_symbol, other_robot_symbol, measurement, noise_model);
+      new_factor = gtsam::BetweenFactor<gtsam::Pose3>(this_robot_symbol, other_robot_symbol, measurement, noise_model_);
 
       UpdateCurrentLoopClosureBuzzStructure( this->GetBuzzVM()->robot,
                                              other_robot_id,
@@ -322,7 +312,7 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(c
                                              measurement.rotation().quaternion()[0] );
    } else {      
       measurement = measurement.inverse();
-      new_factor = gtsam::BetweenFactor<gtsam::Pose3>(other_robot_symbol, this_robot_symbol, measurement, noise_model);
+      new_factor = gtsam::BetweenFactor<gtsam::Pose3>(other_robot_symbol, this_robot_symbol, measurement, noise_model_);
 
       UpdateCurrentLoopClosureBuzzStructure( other_robot_id,
                                              this->GetBuzzVM()->robot,
@@ -338,7 +328,8 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(c
    }   
 
    // Add new factor to local pose graph
-   local_pose_graph_.push_back(new_factor);
+   local_pose_graph_->push_back(new_factor);
+   UpdateOptimizer();
 
    return is_outlier;
 }

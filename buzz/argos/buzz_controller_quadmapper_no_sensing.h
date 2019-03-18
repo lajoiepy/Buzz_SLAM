@@ -1,7 +1,7 @@
 #ifndef BUZZ_CONTROLLER_QUADMAPPER_NO_SENSING_H
 #define BUZZ_CONTROLLER_QUADMAPPER_NO_SENSING_H
 
-#include <buzz/argos/buzz_controller_quadmapper.h>
+#include <argos/buzz_controller_quadmapper.h>
 #include <map>
 
 using namespace argos;

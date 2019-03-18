@@ -32,7 +32,16 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    robot_id_char_ = (unsigned char)(97 + this->GetBuzzVM()->robot);
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
    previous_pose_ = gtsam::Pose3();
-   poses_initial_guess_.insert(previous_symbol_.key(), previous_pose_);
+   poses_initial_guess_->insert(previous_symbol_.key(), previous_pose_);
+
+   // Isotropic noise model
+   Eigen::VectorXd sigmas(6);
+   sigmas << rotation_noise_std_, rotation_noise_std_, rotation_noise_std_, 
+            translation_noise_std_, translation_noise_std_, translation_noise_std_;
+   noise_model_ = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
+
+   // Initialize optimizer
+   InitOptimizer();
 }
 
 /****************************************/
@@ -290,11 +299,6 @@ void CBuzzControllerQuadMapper::AddLoopClosureToLocalGraph( const int& robot_1_i
                                  const double& q_y,
                                  const double& q_z,
                                  const double& q_w  ) {
-   // Isotropic noise model
-   Eigen::VectorXd sigmas(6);
-   sigmas << rotation_noise_std_, rotation_noise_std_, rotation_noise_std_, 
-            translation_noise_std_, translation_noise_std_, translation_noise_std_;
-   gtsam::SharedNoiseModel noise_model = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
 
    // Loop closure symbols
    unsigned char robot_1_id_char = (unsigned char)(97 + robot_1_id);
@@ -313,8 +317,9 @@ void CBuzzControllerQuadMapper::AddLoopClosureToLocalGraph( const int& robot_1_i
    gtsam::Pose3 transformation(R, t);
 
    // Factor
-   gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_1_symbol, robot_2_symbol, transformation, noise_model);
-   local_pose_graph_.push_back(new_factor);
+   gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_1_symbol, robot_2_symbol, transformation, noise_model_);
+   local_pose_graph_->push_back(new_factor);
+   UpdateOptimizer();
 }
 
 /****************************************/
@@ -322,7 +327,73 @@ void CBuzzControllerQuadMapper::AddLoopClosureToLocalGraph( const int& robot_1_i
 
 void CBuzzControllerQuadMapper::WriteDataset(const uint16_t& robot_id) {
    std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id) + ".g2o";
-   gtsam::writeG2o(local_pose_graph_, poses_initial_guess_, dataset_file_name);
+   gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::InitOptimizer() {
+   optimizer_ = boost::shared_ptr<distributed_mapper::DistributedMapper>(new distributed_mapper::DistributedMapper(robot_id_char_, false));
+
+   graph_and_values_ = std::make_pair(local_pose_graph_, poses_initial_guess_);
+
+   // Use between noise or not in optimizePoses
+   optimizer_->setUseBetweenNoiseFlag(false);
+
+   // Use landmarks
+   optimizer_->setUseLandmarksFlag(false);
+
+   // Load subgraphs
+   optimizer_->loadSubgraphAndCreateSubgraphEdge(graph_and_values_);
+
+   // Add prior to the first robot
+   if (this->GetBuzzVM()->robot == 0) {
+      gtsam::Key first_key = gtsam::KeyVector(poses_initial_guess_->keys()).at(0);
+      optimizer_->addPrior(first_key, poses_initial_guess_->at<gtsam::Pose3>(first_key), noise_model_);
+   }
+
+   // Verbosity level
+   optimizer_->setVerbosity(distributed_mapper::DistributedMapper::ERROR);
+
+   disconnected_graph_ = true;
+
+   optimizer_->setFlaggedInit(true);
+   
+   optimizer_->setUpdateType(distributed_mapper::DistributedMapper::incUpdate);
+   
+   optimizer_->setGamma(1.0f);
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::UpdateOptimizer() {
+   
+   // Load subgraphs
+   optimizer_->loadSubgraphAndCreateSubgraphEdge(graph_and_values_);
+
+   // Check for graph connectivity
+   std::set<char> neighboring_robots = optimizer_->getNeighboringChars();
+   if (neighboring_robots.size() > 0) {
+      disconnected_graph_ = false;
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::OutliersFiltering() {
+   
+   // Perform pairwise consistency maximization
+
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::OptimizePoseGraph() {
+   
 }
 
 /****************************************/
