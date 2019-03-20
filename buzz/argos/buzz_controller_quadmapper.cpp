@@ -25,6 +25,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
    rotation_noise_std_ = 0.01;
    translation_noise_std_ = 0.1;
+   maximum_number_of_optimization_iterations_ = 1000;
 
    // Initialize attributes
    previous_orientation_ = CQuaternion();
@@ -35,6 +36,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    local_pose_graph_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
    poses_initial_guess_ = boost::make_shared< gtsam::Values >();
    poses_initial_guess_->insert(previous_symbol_.key(), previous_pose_);
+   current_optimization_iteration_ = 0;
 
    // Isotropic noise model
    Eigen::VectorXd sigmas(6);
@@ -170,7 +172,7 @@ static int BuzzGotoAbs(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-static int BuzzAddLoopClosureToLocalGraph(buzzvm_t vm) {
+static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
    /* Push the vector components */
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
@@ -225,7 +227,7 @@ static int BuzzAddLoopClosureToLocalGraph(buzzvm_t vm) {
    } else {
       buzzvm_seterror(vm,
                       BUZZVM_ERROR_TYPE,
-                      "wrong parameter type for add_loop_closures_to_local_graph."
+                      "wrong parameter type for add_separator_to_local_graph."
          );
       return vm->state;
    }
@@ -233,7 +235,7 @@ static int BuzzAddLoopClosureToLocalGraph(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->AddLoopClosureToLocalGraph(  robot_1_id, robot_2_id,
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->AddSeparatorToLocalGraph(  robot_1_id, robot_2_id,
                                                                                                                robot_1_pose_id, robot_2_pose_id,
                                                                                                                x, y, z,
                                                                                                                q_x, q_y, q_z, q_w  );
@@ -243,7 +245,7 @@ static int BuzzAddLoopClosureToLocalGraph(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::UpdateCurrentLoopClosureBuzzStructure(  const int& robot_1_id,
+void CBuzzControllerQuadMapper::UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
                                              const int& robot_2_id,
                                              const int& robot_1_pose_id,
                                              const int& robot_2_pose_id,
@@ -255,23 +257,23 @@ void CBuzzControllerQuadMapper::UpdateCurrentLoopClosureBuzzStructure(  const in
                                              const double& q_z,
                                              const double& q_w  ) {
    // Create empty data table
-   buzzobj_t b_loop_closure_measurement = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+   buzzobj_t b_separator_measurement = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
    // Store symbol information
-   TablePut(b_loop_closure_measurement, "robot_1_id", robot_1_id);
-   TablePut(b_loop_closure_measurement, "robot_2_id", robot_2_id);
-   TablePut(b_loop_closure_measurement, "robot_1_pose_id", robot_1_pose_id);
-   TablePut(b_loop_closure_measurement, "robot_2_pose_id", robot_2_pose_id);
+   TablePut(b_separator_measurement, "robot_1_id", robot_1_id);
+   TablePut(b_separator_measurement, "robot_2_id", robot_2_id);
+   TablePut(b_separator_measurement, "robot_1_pose_id", robot_1_pose_id);
+   TablePut(b_separator_measurement, "robot_2_pose_id", robot_2_pose_id);
    // Store position data
-   TablePut(b_loop_closure_measurement, "x", x);
-   TablePut(b_loop_closure_measurement, "y", y);
-   TablePut(b_loop_closure_measurement, "z", z);
+   TablePut(b_separator_measurement, "x", x);
+   TablePut(b_separator_measurement, "y", y);
+   TablePut(b_separator_measurement, "z", z);
    // Store orientation data
-   TablePut(b_loop_closure_measurement, "q_x", q_x);
-   TablePut(b_loop_closure_measurement, "q_y", q_y);
-   TablePut(b_loop_closure_measurement, "q_z", q_z);
-   TablePut(b_loop_closure_measurement, "q_w", q_w);
+   TablePut(b_separator_measurement, "q_x", q_x);
+   TablePut(b_separator_measurement, "q_y", q_y);
+   TablePut(b_separator_measurement, "q_z", q_z);
+   TablePut(b_separator_measurement, "q_w", q_w);
    // Register positioning data table as global symbol
-   Register("current_loop_closure_measurement", b_loop_closure_measurement);
+   Register("current_separator_measurement", b_separator_measurement);
 
 }
 
@@ -290,7 +292,7 @@ void CBuzzControllerQuadMapper::SetNextPosition(const CVector3& translation) {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::AddLoopClosureToLocalGraph( const int& robot_1_id,
+void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
                                  const int& robot_2_id,
                                  const int& robot_1_pose_id,
                                  const int& robot_2_pose_id,
@@ -302,10 +304,12 @@ void CBuzzControllerQuadMapper::AddLoopClosureToLocalGraph( const int& robot_1_i
                                  const double& q_z,
                                  const double& q_w  ) {
 
-   // Loop closure symbols
+   // Separator symbols
    unsigned char robot_1_id_char = (unsigned char)(97 + robot_1_id);
+   AddNewKnownRobot(robot_1_id_char);
    gtsam::Symbol robot_1_symbol = gtsam::Symbol(robot_1_id_char, robot_1_pose_id);
    unsigned char robot_2_id_char = (unsigned char)(97 + robot_2_id);
+   AddNewKnownRobot(robot_2_id_char);
    gtsam::Symbol robot_2_symbol = gtsam::Symbol(robot_2_id_char, robot_2_pose_id);
 
    // Translation
@@ -385,6 +389,35 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
 /****************************************/
 /****************************************/
 
+std::vector<size_t> CBuzzControllerQuadMapper::TrivialOrdering() {
+   std::vector<size_t> ordering;
+   for(const gtsam::Values::ConstKeyValuePair& key_value: optimizer_->neighbors()){
+      char symbol = gtsam::symbolChr(key_value.key);
+      ordering.emplace_back(((int) symbol) - 97);
+   }
+}
+
+/****************************************/
+/****************************************/
+
+std::vector<size_t> CBuzzControllerQuadMapper::FlaggedInitializationOrdering() {
+   // TODO
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::AddNewKnownRobot(const unsigned char& other_robot_char) {
+   if (other_robot_char != robot_id_char_) {
+      if (std::find(known_other_robots_.begin(), known_other_robots_.end(), other_robot_char) == known_other_robots_.end()) {
+         known_other_robots_.insert(other_robot_char);
+      }
+   }
+}
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapper::OutliersFiltering() {
    
    // Perform pairwise consistency maximization
@@ -394,8 +427,20 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
 /****************************************/
 /****************************************/
 
+void OptimizeRotations() {
+
+}
+
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapper::OptimizePoseGraph() {
-   
+   OutliersFiltering();
+
+   // TODO: Add flagged initialization
+   std::vector<size_t> ordering = TrivialOrdering();
+
 }
 
 /****************************************/
@@ -413,8 +458,8 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzRandUniform));
    buzzvm_gstore(m_tBuzzVM);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "add_loop_closure_to_local_graph", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzAddLoopClosureToLocalGraph));
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "add_separator_to_local_graph", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzAddSeparatorToLocalGraph));
    buzzvm_gstore(m_tBuzzVM);
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "goto_abs", 1));

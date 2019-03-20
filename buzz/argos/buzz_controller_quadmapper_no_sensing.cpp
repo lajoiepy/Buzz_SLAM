@@ -25,7 +25,7 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
 
    // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
    sensor_range_ = 15;
-   outlier_probability_ = 0.1;
+   outlier_probability_ = 0.0; // TODO: Currently no outlier until I integrate the pairwise consistency maximization.
    number_of_outliers_added_ = 0;
 
    // Initialize random numbers generators
@@ -39,14 +39,14 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    uniform_distribution_outliers_rotation_ = std::uniform_real_distribution<>{-M_PI, M_PI};
    uniform_distribution_draw_outlier_ = std::uniform_real_distribution<>{0, 1};
 
-   // Save ground truth for fake loop closure creation
+   // Save ground truth for fake separator creation
    SavePoseGroundTruth();
 }
 
 /****************************************/
 /****************************************/
 
-static int BuzzComputeFakeRendezVousLoopClosures(buzzvm_t vm) {
+static int BuzzComputeFakeRendezVousSeparators(buzzvm_t vm) {
    /* Push the vector components */
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
@@ -90,7 +90,7 @@ static int BuzzComputeFakeRendezVousLoopClosures(buzzvm_t vm) {
    } else {
       buzzvm_seterror(vm,
                       BUZZVM_ERROR_TYPE,
-                      "wrong parameter type for compute_fake_rendezvous_loop_closures."
+                      "wrong parameter type for compute_fake_rendezvous_separators."
          );
       return vm->state;
    }
@@ -98,7 +98,7 @@ static int BuzzComputeFakeRendezVousLoopClosures(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   int is_outlier = reinterpret_cast<CBuzzControllerQuadMapperNoSensing*>(buzzvm_stack_at(vm, 1)->u.value)->ComputeNoisyFakeLoopClosureMeasurement(gt_orientation, gt_translation, other_robot_pose_id, other_robot_id, this_robot_pose_id);
+   int is_outlier = reinterpret_cast<CBuzzControllerQuadMapperNoSensing*>(buzzvm_stack_at(vm, 1)->u.value)->ComputeNoisyFakeSeparatorMeasurement(gt_orientation, gt_translation, other_robot_pose_id, other_robot_id, this_robot_pose_id);
    buzzvm_pushi(vm, is_outlier);
 
    return buzzvm_ret1(vm);
@@ -212,7 +212,7 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement(con
 
    UpdateOptimizer();
 
-   // Save ground truth for fake loop closure creation
+   // Save ground truth for fake separator creation
    SavePoseGroundTruth();
 }
 
@@ -260,9 +260,9 @@ gtsam::Pose3 CBuzzControllerQuadMapperNoSensing::OutlierMeasurement(const gtsam:
 /****************************************/
 /****************************************/
 
-int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
+int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
                                                                const int& other_robot_pose_id, const int& other_robot_id, const int& this_robot_pose_id) {
-   // Loop closure symbols
+   // Separator symbols
    gtsam::Symbol this_robot_symbol = gtsam::Symbol(robot_id_char_, this_robot_pose_id);
    unsigned char other_robot_id_char = (unsigned char)(97 + other_robot_id);
    gtsam::Symbol other_robot_symbol = gtsam::Symbol(other_robot_id_char, other_robot_pose_id);
@@ -294,12 +294,12 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(c
    }
 
    // Initialize factor
-   // Enforce an order for loop closure measurement. (lower_id, higher_id).
+   // Enforce an order for separator measurement. (lower_id, higher_id).
    gtsam::BetweenFactor<gtsam::Pose3> new_factor;
    if (other_robot_symbol.chr() > this_robot_symbol.chr()) {
       new_factor = gtsam::BetweenFactor<gtsam::Pose3>(this_robot_symbol, other_robot_symbol, measurement, noise_model_);
 
-      UpdateCurrentLoopClosureBuzzStructure( this->GetBuzzVM()->robot,
+      UpdateCurrentSeparatorBuzzStructure( this->GetBuzzVM()->robot,
                                              other_robot_id,
                                              this_robot_pose_id,
                                              other_robot_pose_id,
@@ -314,7 +314,7 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeLoopClosureMeasurement(c
       measurement = measurement.inverse();
       new_factor = gtsam::BetweenFactor<gtsam::Pose3>(other_robot_symbol, this_robot_symbol, measurement, noise_model_);
 
-      UpdateCurrentLoopClosureBuzzStructure( other_robot_id,
+      UpdateCurrentSeparatorBuzzStructure( other_robot_id,
                                              this->GetBuzzVM()->robot,
                                              other_robot_pose_id,
                                              this_robot_pose_id,
@@ -357,8 +357,8 @@ buzzvm_state CBuzzControllerQuadMapperNoSensing::RegisterFunctions() {
    CBuzzControllerQuadMapper::RegisterFunctions();
 
    /* Register mapping without sensing specific functions */
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "compute_fake_rendezvous_loop_closures", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzComputeFakeRendezVousLoopClosures));
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "compute_fake_rendezvous_separator", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzComputeFakeRendezVousSeparators));
    buzzvm_gstore(m_tBuzzVM);
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "move_forward_fake_odometry", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzMoveForwardFakeOdometry));

@@ -17,6 +17,9 @@
 
 using namespace argos;
 
+/*
+* This class should not be instanciated, you should use its children (with or without sensing)
+*/
 class CBuzzControllerQuadMapper : public CBuzzControllerSpiri {
 
 public:
@@ -29,7 +32,7 @@ public:
 
    void SetNextPosition(const CVector3& c_heading);
 
-   void AddLoopClosureToLocalGraph( const int& robot_1_id,
+   void AddSeparatorToLocalGraph( const int& robot_1_id,
                                     const int& robot_2_id,
                                     const int& robot_1_pose_id,
                                     const int& robot_2_pose_id,
@@ -43,7 +46,7 @@ public:
 
 protected:
 
-   void UpdateCurrentLoopClosureBuzzStructure(  const int& robot_1_id,
+   void UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
                                                 const int& robot_2_id,
                                                 const int& robot_1_pose_id,
                                                 const int& robot_2_pose_id,
@@ -68,6 +71,14 @@ protected:
 
    void OutliersFiltering();
 
+   std::vector<size_t> TrivialOrdering();
+
+   std::vector<size_t> FlaggedInitializationOrdering();
+
+   void OptimizeRotations();
+
+   void AddNewKnownRobot(const unsigned char& other_robot_char);
+
 protected:
 
    boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_;
@@ -88,11 +99,18 @@ protected:
 
    boost::shared_ptr<distributed_mapper::DistributedMapper> optimizer_;
 
+   std::set<unsigned char> known_other_robots_;
+
+   bool disconnected_graph_;
+
+   int current_optimization_iteration_;
+
+   // Constants that should be parameters in the future
    double rotation_noise_std_, translation_noise_std_;
 
    gtsam::SharedNoiseModel noise_model_;
 
-   bool disconnected_graph_;
+   int maximum_number_of_optimization_iterations_;
 
 };
 
