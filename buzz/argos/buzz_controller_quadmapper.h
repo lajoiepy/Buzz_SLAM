@@ -87,8 +87,6 @@ protected:
 
    gtsam::GraphAndValues graph_and_values_;
 
-   CQuaternion previous_orientation_;
-
    gtsam::Symbol previous_symbol_;
 
    gtsam::Pose3 previous_pose_;

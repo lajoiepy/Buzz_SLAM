@@ -16,14 +16,14 @@ public:
 
    virtual void Init(TConfigurationNode& t_node);
 
-   int MoveForwardFakeOdometry(const CVector3& distance, const uint16_t& robot_id);
+   int MoveForwardFakeOdometry(const CVector3& distance, const int& simulation_time_divider);
 
    int ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
                                           const int& pose_id, const int& robot_id, const int& this_robot_pose_id);
 
 private:
 
-   void ComputeNoisyFakeOdometryMeasurement(const CQuaternion& current_orientation, const CVector3& translation);
+   void ComputeNoisyFakeOdometryMeasurement();
 
    gtsam::Pose3 AddGaussianNoiseToMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t);
 
@@ -38,6 +38,7 @@ protected:
 private:
 
    std::map<int, gtsam::Pose3> ground_truth_poses_;
+   argos::CCI_PositioningSensor::SReading previous_simulation_gt_pose_;
 
    std::random_device rd_{};
    std::mt19937 gen_translation_, gen_rotation_, gen_outliers_;
@@ -46,6 +47,7 @@ private:
                                     uniform_distribution_outliers_rotation_,
                                     uniform_distribution_draw_outlier_;
 
+   int simulation_step_;
    int number_of_outliers_added_;
    double outlier_probability_;
    double sensor_range_;

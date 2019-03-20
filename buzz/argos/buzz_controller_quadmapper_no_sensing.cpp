@@ -38,6 +38,8 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    uniform_distribution_outliers_translation_ = std::uniform_real_distribution<>{0, sensor_range_};
    uniform_distribution_outliers_rotation_ = std::uniform_real_distribution<>{-M_PI, M_PI};
    uniform_distribution_draw_outlier_ = std::uniform_real_distribution<>{0, 1};
+   simulation_step_ = 0;
+   previous_simulation_gt_pose_ = m_pcPos->GetReading();
 
    // Save ground truth for fake separator creation
    SavePoseGroundTruth();
@@ -46,7 +48,7 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
 /****************************************/
 /****************************************/
 
-static int BuzzComputeFakeRendezVousSeparators(buzzvm_t vm) {
+static int BuzzComputeFakeRendezVousSeparator(buzzvm_t vm) {
    /* Push the vector components */
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
@@ -90,7 +92,7 @@ static int BuzzComputeFakeRendezVousSeparators(buzzvm_t vm) {
    } else {
       buzzvm_seterror(vm,
                       BUZZVM_ERROR_TYPE,
-                      "wrong parameter type for compute_fake_rendezvous_separators."
+                      "wrong parameter type for compute_fake_rendezvous_separator."
          );
       return vm->state;
    }
@@ -110,9 +112,12 @@ static int BuzzComputeFakeRendezVousSeparators(buzzvm_t vm) {
 static int BuzzMoveForwardFakeOdometry(buzzvm_t vm) {
    /* Push the vector components */
    buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
    /* Create a new vector with that */
    CVector3 translation;
-   buzzobj_t step = buzzvm_stack_at(vm, 1);
+   int simulation_time_divider;
+   buzzobj_t step = buzzvm_stack_at(vm, 2);
+   buzzobj_t b_simulation_time_divider = buzzvm_stack_at(vm, 1);
    if(step->o.type == BUZZTYPE_INT) translation.SetX(step->i.value);
    else if(step->o.type == BUZZTYPE_FLOAT) translation.SetX(step->f.value);
    else {
@@ -123,12 +128,22 @@ static int BuzzMoveForwardFakeOdometry(buzzvm_t vm) {
                       buzztype_desc[step->o.type]
          );
       return vm->state;
-   }      
+   }   
+   if(b_simulation_time_divider->o.type == BUZZTYPE_INT) simulation_time_divider = b_simulation_time_divider->i.value;
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "move_forward(x,y): expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[b_simulation_time_divider->o.type]
+         );
+      return vm->state;
+   }    
    /* Get pointer to the controller */
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   int current_pose_id = reinterpret_cast<CBuzzControllerQuadMapperNoSensing*>(buzzvm_stack_at(vm, 1)->u.value)->MoveForwardFakeOdometry(translation, vm->robot);
+   int current_pose_id = reinterpret_cast<CBuzzControllerQuadMapperNoSensing*>(buzzvm_stack_at(vm, 1)->u.value)->MoveForwardFakeOdometry(translation, simulation_time_divider);
    
    buzzvm_pushi(vm, current_pose_id);
 
@@ -138,7 +153,9 @@ static int BuzzMoveForwardFakeOdometry(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& distance, const uint16_t& robot_id) {
+int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& distance, const int& simulation_time_divider) {
+
+   simulation_step_ ++;
 
    // Move
    CQuaternion current_orientation = m_pcPos->GetReading().Orientation;
@@ -158,11 +175,13 @@ int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& 
 
    m_pcPropellers->SetAbsolutePosition(new_position);
    
-   // Add noisy measurement
-   ComputeNoisyFakeOdometryMeasurement(current_orientation, translation);
+   if (simulation_step_ % simulation_time_divider == 0) {
+      // Add noisy measurement
+      ComputeNoisyFakeOdometryMeasurement();
 
-   // Log data
-   WriteDataset(robot_id);   
+      // Log data
+      WriteDataset(this->GetBuzzVM()->robot);   
+   }
 
    return number_of_poses_;
 }
@@ -170,8 +189,14 @@ int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& 
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement(const CQuaternion& current_orientation, const CVector3& translation) {
+void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement() {
    
+   // Extract info
+   CQuaternion previous_orientation = previous_simulation_gt_pose_.Orientation;
+   CQuaternion current_orientation = m_pcPos->GetReading().Orientation;
+   CVector3 previous_position = previous_simulation_gt_pose_.Position;
+   CVector3 current_position = m_pcPos->GetReading().Position;
+
    // Increase the number of poses
    number_of_poses_++;
 
@@ -179,7 +204,7 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement(con
    gtsam::Symbol current_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
 
    // Conversion of the previous orientation (quaternion to rotation matrix)
-   gtsam::Quaternion previous_quat_gtsam(previous_orientation_.GetW(), previous_orientation_.GetX(), previous_orientation_.GetY(), previous_orientation_.GetZ());
+   gtsam::Quaternion previous_quat_gtsam(previous_orientation.GetW(), previous_orientation.GetX(), previous_orientation.GetY(), previous_orientation.GetZ());
    gtsam::Rot3 previous_R(previous_quat_gtsam);
    
    // Conversion of the current orientation (quaternion to rotation matrix)
@@ -190,7 +215,9 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement(con
    gtsam::Rot3 R = previous_R.inverse() * current_R;
 
    // Convert translation information to gtsam format and perform the appropriate rotation
-   gtsam::Point3 t = { translation.GetX(), translation.GetY(), translation.GetZ()};
+   gtsam::Point3 t = {  current_position.GetX() - previous_position.GetX(), 
+                        current_position.GetY() - previous_position.GetY(),
+                        current_position.GetZ() - previous_position.GetZ()};
    t = previous_R.inverse() * t;
 
    // Add gaussian noise
@@ -200,7 +227,7 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement(con
    gtsam::BetweenFactor<gtsam::Pose3> new_factor(previous_symbol_, current_symbol_, measurement, noise_model_);
 
    // Update attributes value
-   previous_orientation_ = m_pcPos->GetReading().Orientation;
+   previous_simulation_gt_pose_ = m_pcPos->GetReading();
    previous_pose_ = previous_pose_ * measurement;
    previous_symbol_ = current_symbol_;
 
@@ -358,7 +385,7 @@ buzzvm_state CBuzzControllerQuadMapperNoSensing::RegisterFunctions() {
 
    /* Register mapping without sensing specific functions */
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "compute_fake_rendezvous_separator", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzComputeFakeRendezVousSeparators));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzComputeFakeRendezVousSeparator));
    buzzvm_gstore(m_tBuzzVM);
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "move_forward_fake_odometry", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzMoveForwardFakeOdometry));

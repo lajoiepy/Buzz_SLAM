@@ -28,7 +28,6 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    maximum_number_of_optimization_iterations_ = 1000;
 
    // Initialize attributes
-   previous_orientation_ = CQuaternion();
    number_of_poses_ = 0;
    robot_id_char_ = (unsigned char)(97 + this->GetBuzzVM()->robot);
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
