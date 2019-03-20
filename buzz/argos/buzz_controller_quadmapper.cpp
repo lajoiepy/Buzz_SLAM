@@ -32,6 +32,8 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    robot_id_char_ = (unsigned char)(97 + this->GetBuzzVM()->robot);
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
    previous_pose_ = gtsam::Pose3();
+   local_pose_graph_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
+   poses_initial_guess_ = boost::make_shared< gtsam::Values >();
    poses_initial_guess_->insert(previous_symbol_.key(), previous_pose_);
 
    // Isotropic noise model
