@@ -15,11 +15,12 @@ pkg_check_modules(ARGOS argos3_simulator)
 if(ARGOS_FOUND)
   include_directories(${ARGOS_INCLUDE_DIRS})
   link_directories(${ARGOS_LIBRARY_DIRS})
-  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} /usr/share/argos3/cmake)
+  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${ARGOS_PREFIX}/share/argos3/cmake)
   include(ARGoSCheckQTOpenGL)
   # Look for Lua52
   find_package(Lua52 REQUIRED)
   include_directories(${LUA_INCLUDE_DIR})
+  link_directories(${ARGOS_PREFIX}/lib/argos3/)
 endif(ARGOS_FOUND)
 
 #
@@ -43,7 +44,6 @@ message("Boost Libraries: ${Boost_LIBRARIES}")
 #
 # Compile buzz slam library
 #
-link_directories(/usr/lib/argos3/)
 set(ARGOS_BUZZ_SOURCES
   argos/buzz_controller_quadmapper.h      
   argos/buzz_controller_quadmapper.cpp
@@ -64,5 +64,5 @@ target_link_libraries(argos3plugin_simulator_buzz_slam
 
 set_target_properties(argos3plugin_simulator_buzz_slam PROPERTIES LINKER_LANGUAGE CXX)
 
-install(TARGETS argos3plugin_simulator_buzz_slam LIBRARY DESTINATION /usr/lib/argos3)
+install(TARGETS argos3plugin_simulator_buzz_slam LIBRARY DESTINATION ${ARGOS_PREFIX}/lib/argos3)
 install(DIRECTORY . DESTINATION include/buzz/argos FILES_MATCHING PATTERN "*.h")
