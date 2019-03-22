@@ -25,7 +25,7 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
 
    // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
    sensor_range_ = 15;
-   outlier_probability_ = 0.0; // TODO: Currently no outlier until I integrate the pairwise consistency maximization.
+   outlier_probability_ = 0.0; // TODO: Currently no outlier until I integrate the distributed pairwise consistency maximization.
    number_of_outliers_added_ = 0;
 
    // Initialize random numbers generators
@@ -110,6 +110,7 @@ static int BuzzComputeFakeRendezVousSeparator(buzzvm_t vm) {
 /****************************************/
 
 static int BuzzMoveForwardFakeOdometry(buzzvm_t vm) {
+   std::cout << "BuzzMoveForwardFakeOdometry" << std::endl;
    /* Push the vector components */
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
@@ -154,6 +155,7 @@ static int BuzzMoveForwardFakeOdometry(buzzvm_t vm) {
 /****************************************/
 
 int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& distance, const int& simulation_time_divider) {
+   std::cout << "MoveForwardFakeOdometry" << std::endl;
 
    simulation_step_ ++;
 
@@ -198,7 +200,7 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement() {
    CVector3 current_position = m_pcPos->GetReading().Position;
 
    // Increase the number of poses
-   number_of_poses_++;
+   IncrementNumberOfPosesAndUpdateState();
 
    // Next symbol
    gtsam::Symbol current_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
@@ -236,8 +238,6 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement() {
 
    // Add new pose estimate into initial guess
    poses_initial_guess_->insert(previous_symbol_.key(), previous_pose_);
-
-   UpdateOptimizer();
 
    // Save ground truth for fake separator creation
    SavePoseGroundTruth();
@@ -356,7 +356,6 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(new_factor);
-   UpdateOptimizer();
 
    return is_outlier;
 }

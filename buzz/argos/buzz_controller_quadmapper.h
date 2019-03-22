@@ -17,6 +17,8 @@
 
 using namespace argos;
 
+enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimation, End };
+
 /*
 * This class should not be instanciated, you should use its children (with or without sensing)
 */
@@ -44,6 +46,11 @@ public:
                                     const double& q_z,
                                     const double& q_w  );
 
+   // Wrapper function related to distributed_mapper
+   void InitOptimizer(const int& period);
+
+   OptimizerState GetOptimizerState();
+
 protected:
 
    void UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
@@ -62,10 +69,10 @@ protected:
 
    void WriteDataset(const uint16_t& robot_id);
 
-   // Wrapper function related to distributed_mapper
-   void InitOptimizer();
+   void IncrementNumberOfPosesAndUpdateState();
 
-   void OptimizePoseGraph();
+   // Wrapper function related to distributed_mapper
+   void StartPoseGraphOptimization();
 
    void UpdateOptimizer();
 
@@ -75,7 +82,9 @@ protected:
 
    std::vector<size_t> FlaggedInitializationOrdering();
 
-   void OptimizeRotations();
+   void OptimizeRotationsIteration();
+
+   void UpdateLocalEstimates();
 
    void AddNewKnownRobot(const unsigned char& other_robot_char);
 
@@ -93,6 +102,8 @@ protected:
 
    int number_of_poses_;
 
+   uint16_t robot_id_;
+
    unsigned char robot_id_char_;
 
    boost::shared_ptr<distributed_mapper::DistributedMapper> optimizer_;
@@ -102,6 +113,10 @@ protected:
    bool disconnected_graph_;
 
    int current_optimization_iteration_;
+
+   OptimizerState optimizer_state_;
+
+   int optimizer_period_;
 
    // Constants that should be parameters in the future
    double rotation_noise_std_, translation_noise_std_;
