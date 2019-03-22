@@ -110,7 +110,6 @@ static int BuzzComputeFakeRendezVousSeparator(buzzvm_t vm) {
 /****************************************/
 
 static int BuzzMoveForwardFakeOdometry(buzzvm_t vm) {
-   std::cout << "BuzzMoveForwardFakeOdometry" << std::endl;
    /* Push the vector components */
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
@@ -155,8 +154,6 @@ static int BuzzMoveForwardFakeOdometry(buzzvm_t vm) {
 /****************************************/
 
 int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& distance, const int& simulation_time_divider) {
-   std::cout << "MoveForwardFakeOdometry" << std::endl;
-
    simulation_step_ ++;
 
    // Move

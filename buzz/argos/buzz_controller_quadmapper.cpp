@@ -49,14 +49,10 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
 
 static int BuzzInitOptimizer(buzzvm_t vm){
 
-   std::cout << "checkpoint buzz_init" << std::endl;
    buzzvm_lload(vm, 1);
    
    buzzobj_t buzz_period = buzzvm_stack_at(vm, 1);
    int period;
-
-   std::cout << "checkpoint 0 " << std::endl;
-   //std::cout << "period = " << buzz_period->i.value << std::endl;
 
    if(buzz_period->o.type == BUZZTYPE_INT) period = buzz_period->i.value;
    else {
@@ -68,13 +64,11 @@ static int BuzzInitOptimizer(buzzvm_t vm){
          );
       return vm->state;
    } 
-   std::cout << "checkpoint 1 " << std::endl;
 
    // Initialize optimizer
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->InitOptimizer(period);
-   std::cout << "checkpoint 2 " << std::endl;
 
    return buzzvm_ret0(vm);
 }
@@ -84,12 +78,10 @@ static int BuzzInitOptimizer(buzzvm_t vm){
 
 static int BuzzOptimizerState(buzzvm_t vm){
 
-   std::cout << "opt state 1 " << std::endl;
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    int state = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->GetOptimizerState();
    buzzvm_pushi(vm, state);
-   std::cout << "opt state 2 " << std::endl;
 
    return buzzvm_ret1(vm);
 }
@@ -344,8 +336,6 @@ void CBuzzControllerQuadMapper::SetNextPosition(const CVector3& translation) {
 
 void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
    number_of_poses_++;
-   std::cout << "Increment" << optimizer_period_ << "  n_poses=" << number_of_poses_ << std::endl;
-   //optimizer_period_ = 100;
    // Update optimizer state
    switch (optimizer_state_) {
       case Idle :
@@ -432,32 +422,24 @@ void CBuzzControllerQuadMapper::AddNewKnownRobot(const unsigned char& other_robo
 
 void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
 
-   std::cout << "checkpoint 1.1.0 " << std::endl;
-   // (unsigned char)(97 + this->GetBuzzVM()->robot)
-   std::cout << "robot = " << robot_id_ << std::endl;
    optimizer_ = boost::shared_ptr<distributed_mapper::DistributedMapper>(new distributed_mapper::DistributedMapper(robot_id_char_));
 
-   std::cout << "checkpoint 1.1.1 " << std::endl;
    graph_and_values_ = std::make_pair(local_pose_graph_, poses_initial_guess_);
 
-   std::cout << "checkpoint 1.2 " << std::endl;
    // Use between noise or not in optimizePoses
    optimizer_->setUseBetweenNoiseFlag(false);
 
    // Use landmarks
    optimizer_->setUseLandmarksFlag(false);
 
-   std::cout << "checkpoint 1.3 " << std::endl;
    // Load subgraphs
    optimizer_->loadSubgraphAndCreateSubgraphEdge(graph_and_values_);
-   std::cout << "checkpoint 1.4 " << std::endl;
 
    // Add prior to the first robot
    if (robot_id_ == 0) {
       gtsam::Key first_key = gtsam::KeyVector(poses_initial_guess_->keys()).at(0);
       optimizer_->addPrior(first_key, poses_initial_guess_->at<gtsam::Pose3>(first_key), noise_model_);
    }
-   std::cout << "checkpoint 1.5 " << std::endl;
 
    // Verbosity level
    optimizer_->setVerbosity(distributed_mapper::DistributedMapper::ERROR);
@@ -470,12 +452,9 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
    
    optimizer_->setGamma(1.0f);
 
-   std::cout << "checkpoint 1.6 " << std::endl;
    optimizer_state_ = OptimizerState::Idle;
-   std::cout << "checkpoint 1.7 " << std::endl;
 
    optimizer_period_ = period;
-   std::cout << "checkpoint 1.8 " << optimizer_period_ << std::endl;
 }
 
 /****************************************/
@@ -585,8 +564,6 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "optimizer_state", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzOptimizerState));
    buzzvm_gstore(m_tBuzzVM);
-
-   std::cout << "Finished registering" << std::endl;
 
    return m_tBuzzVM->state;
 }
