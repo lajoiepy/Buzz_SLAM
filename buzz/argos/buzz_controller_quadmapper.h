@@ -49,6 +49,8 @@ public:
    // Wrapper function related to distributed_mapper
    void InitOptimizer(const int& period);
 
+   void AddNeighborWithinCommunicationRange(const int& rid);
+
    OptimizerState GetOptimizerState();
 
 protected:
@@ -118,12 +120,16 @@ protected:
 
    int optimizer_period_;
 
+   std::vector<int> neighbors_within_communication_range_;
+
    // Constants that should be parameters in the future
    double rotation_noise_std_, translation_noise_std_;
 
    gtsam::SharedNoiseModel noise_model_;
 
    int maximum_number_of_optimization_iterations_;
+
+   int optimization_phase_length_;
 
 };
 

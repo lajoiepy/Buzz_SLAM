@@ -25,6 +25,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    rotation_noise_std_ = 0.01;
    translation_noise_std_ = 0.1;
    maximum_number_of_optimization_iterations_ = 1000;
+   optimization_phase_length_ = 20;
 
    // Initialize attributes
    number_of_poses_ = 0;
@@ -84,6 +85,36 @@ static int BuzzOptimizerState(buzzvm_t vm){
    buzzvm_pushi(vm, state);
 
    return buzzvm_ret1(vm);
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzAddNeighborWithinCommunicationRange(buzzvm_t vm){
+
+   buzzvm_lload(vm, 1);
+   
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 1);
+   int rid;
+
+   if(buzz_rid->o.type == BUZZTYPE_INT) rid = buzz_rid->i.value;
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "AddNeighborWithinCommunicationRange: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[buzz_rid->o.type]
+         );
+      return vm->state;
+   } 
+
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->AddNeighborWithinCommunicationRange(rid);
+
+   return buzzvm_ret0(vm);
 }
 
 /****************************************/
@@ -334,6 +365,16 @@ void CBuzzControllerQuadMapper::SetNextPosition(const CVector3& translation) {
    m_pcPropellers->SetAbsolutePosition(new_position);
 }
 
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& rid) {
+   neighbors_within_communication_range_.emplace_back(rid);
+}
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
    number_of_poses_++;
    // Update optimizer state
@@ -341,15 +382,22 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
       case Idle :
          if (number_of_poses_ % optimizer_period_ == 0) {
             optimizer_state_ = OptimizerState::Start;
+            current_optimization_iteration_ = 0;
+            neighbors_within_communication_range_.clear();
          }
          break;
       case Start :
-         if (number_of_poses_ % (optimizer_period_ + 10) == 0) {
-            optimizer_state_ = OptimizerState::Idle;
-         }
+         optimizer_state_ = OptimizerState::RotationEstimation;
          break;
       case RotationEstimation :
-
+         std::cout << "ROBOT" << robot_id_ << " : Rotation estimation nposes=" << number_of_poses_ << "N: ";
+         for (auto neighbor : neighbors_within_communication_range_) {
+            std::cout << neighbor << ", ";
+         }
+         std::cout << std::endl;
+         if (number_of_poses_ % (optimizer_period_ + optimization_phase_length_) == 0) {
+            optimizer_state_ = OptimizerState::Idle;
+         }
          break;
       case PoseEstimation :
 
@@ -564,6 +612,11 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "optimizer_state", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzOptimizerState));
    buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "add_neighbor_within_communication_range", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzAddNeighborWithinCommunicationRange));
+   buzzvm_gstore(m_tBuzzVM);
+
 
    return m_tBuzzVM->state;
 }
