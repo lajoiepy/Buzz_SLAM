@@ -120,6 +120,47 @@ static int BuzzAddNeighborWithinCommunicationRange(buzzvm_t vm){
 /****************************************/
 /****************************************/
 
+static int BuzzComputeAndUpdateRotationEstimatesToSend(buzzvm_t vm){
+
+   buzzvm_lload(vm, 1);
+   
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 1);
+   int rid;
+
+   if(buzz_rid->o.type == BUZZTYPE_INT) rid = buzz_rid->i.value;
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "BuzzComputeAndUpdateRotationEstimatesToSend: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[buzz_rid->o.type]
+         );
+      return vm->state;
+   } 
+
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->AddNeighborWithinCommunicationRange(rid);
+
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzUpdateNeighborRotationEstimatesToSend(buzzvm_t vm){
+
+   
+   
+   return buzzvm_ret0(vm);
+}
+
+
+/****************************************/
+/****************************************/
+
 static int BuzzSRand(buzzvm_t vm){
 
    buzzvm_lload(vm, 1);
@@ -375,6 +416,46 @@ void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& r
 /****************************************/
 /****************************************/
 
+void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
+
+   // Create empty data table
+   buzzobj_t b_rotation_estimates = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+
+   // for each loop closure
+   //  Key, linearized rotation, is init
+   int table_size = 0;
+   for (const gtsam::Values::ConstKeyValuePair& key_value: optimizer_->neighbors()){
+
+      gtsam::Key key = key_value.key;
+      gtsam::Symbol symbol = gtsam::Symbol(key);
+      int other_robot_id = (int)(symbol.chr() - 97);
+
+      if (rid == other_robot_id) {
+         int other_robot_pose_id = symbol.index();
+
+         gtsam::Vector rotation_estimate = optimizer_->linearizedRotationAt(key);
+         std::cout << "Rotation estimate size = " << rotation_estimate.size() << std::endl;
+         bool optimizer_initialized = optimizer_->isRobotInitialized();
+
+         buzzobj_t b_individual_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+
+         TablePut(b_individual_estimate, "other_robot_id", other_robot_id);
+         TablePut(b_individual_estimate, "other_robot_pose_id", other_robot_pose_id);
+         TablePut(b_individual_estimate, "other_robot_initialized", (int) optimizer_initialized);
+         
+
+         TablePut(b_rotation_estimates, table_size, b_individual_estimate);
+      }
+
+   }
+
+   // Register positioning data table as global symbol
+   Register("rotation_estimates_to_send", b_rotation_estimates);
+}
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
    number_of_poses_++;
    // Update optimizer state
@@ -390,13 +471,8 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          optimizer_state_ = OptimizerState::RotationEstimation;
          break;
       case RotationEstimation :
-         std::cout << "ROBOT" << robot_id_ << " : Rotation estimation nposes=" << number_of_poses_ << "N: ";
-         for (auto neighbor : neighbors_within_communication_range_) {
-            std::cout << neighbor << ", ";
-         }
-         std::cout << std::endl;
          if (number_of_poses_ % (optimizer_period_ + optimization_phase_length_) == 0) {
-            optimizer_state_ = OptimizerState::Idle;
+            optimizer_state_ = OptimizerState::End;
          }
          break;
       case PoseEstimation :
@@ -404,6 +480,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          break;
       case End :
 
+         optimizer_state_ = OptimizerState::Idle;
          break;
    }
 }
@@ -616,7 +693,14 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "add_neighbor_within_communication_range", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzAddNeighborWithinCommunicationRange));
    buzzvm_gstore(m_tBuzzVM);
+   
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "compute_and_update_rotation_estimates_to_send", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzComputeAndUpdateRotationEstimatesToSend));
+   buzzvm_gstore(m_tBuzzVM);
 
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_rotation_estimates", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborRotationEstimatesToSend));
+   buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;
 }

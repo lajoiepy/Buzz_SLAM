@@ -53,6 +53,8 @@ public:
 
    OptimizerState GetOptimizerState();
 
+   void ComputeAndUpdateRotationEstimatesToSend(const int& rid);
+
 protected:
 
    void UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
