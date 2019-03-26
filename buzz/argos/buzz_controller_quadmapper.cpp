@@ -142,7 +142,7 @@ static int BuzzComputeAndUpdateRotationEstimatesToSend(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->AddNeighborWithinCommunicationRange(rid);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->ComputeAndUpdateRotationEstimatesToSend(rid);
 
    return buzzvm_ret0(vm);
 }
@@ -153,7 +153,7 @@ static int BuzzComputeAndUpdateRotationEstimatesToSend(buzzvm_t vm){
 static int BuzzUpdateNeighborRotationEstimatesToSend(buzzvm_t vm){
 
    
-   
+
    return buzzvm_ret0(vm);
 }
 
@@ -409,53 +409,6 @@ void CBuzzControllerQuadMapper::SetNextPosition(const CVector3& translation) {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& rid) {
-   neighbors_within_communication_range_.emplace_back(rid);
-}
-
-/****************************************/
-/****************************************/
-
-void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
-
-   // Create empty data table
-   buzzobj_t b_rotation_estimates = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
-
-   // for each loop closure
-   //  Key, linearized rotation, is init
-   int table_size = 0;
-   for (const gtsam::Values::ConstKeyValuePair& key_value: optimizer_->neighbors()){
-
-      gtsam::Key key = key_value.key;
-      gtsam::Symbol symbol = gtsam::Symbol(key);
-      int other_robot_id = (int)(symbol.chr() - 97);
-
-      if (rid == other_robot_id) {
-         int other_robot_pose_id = symbol.index();
-
-         gtsam::Vector rotation_estimate = optimizer_->linearizedRotationAt(key);
-         std::cout << "Rotation estimate size = " << rotation_estimate.size() << std::endl;
-         bool optimizer_initialized = optimizer_->isRobotInitialized();
-
-         buzzobj_t b_individual_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
-
-         TablePut(b_individual_estimate, "other_robot_id", other_robot_id);
-         TablePut(b_individual_estimate, "other_robot_pose_id", other_robot_pose_id);
-         TablePut(b_individual_estimate, "other_robot_initialized", (int) optimizer_initialized);
-         
-
-         TablePut(b_rotation_estimates, table_size, b_individual_estimate);
-      }
-
-   }
-
-   // Register positioning data table as global symbol
-   Register("rotation_estimates_to_send", b_rotation_estimates);
-}
-
-/****************************************/
-/****************************************/
-
 void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
    number_of_poses_++;
    // Update optimizer state
@@ -468,7 +421,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          }
          break;
       case Start :
-         optimizer_state_ = OptimizerState::RotationEstimation;
+         StartPoseGraphOptimization();
          break;
       case RotationEstimation :
          if (number_of_poses_ % (optimizer_period_ + optimization_phase_length_) == 0) {
@@ -625,13 +578,16 @@ std::vector<size_t> CBuzzControllerQuadMapper::TrivialOrdering() {
       char symbol = gtsam::symbolChr(key_value.key);
       ordering.emplace_back(((int) symbol) - 97);
    }
+   return ordering;
 }
 
 /****************************************/
 /****************************************/
 
 std::vector<size_t> CBuzzControllerQuadMapper::FlaggedInitializationOrdering() {
+   std::vector<size_t> ordering;
    // TODO
+   return ordering;
 }
 
 /****************************************/
@@ -641,6 +597,58 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
    
    // Perform pairwise consistency maximization
 
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& rid) {
+   neighbors_within_communication_range_.emplace_back(rid);
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
+
+   // Create empty data table
+   buzzobj_t b_rotation_estimates = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+
+   // for each loop closure
+   //  Key, linearized rotation, is init
+   int table_size = 0;
+   for (const std::pair<gtsam::Symbol, gtsam::Symbol>& separator_symbols: optimizer_->separatorsSymbols()){
+
+      gtsam::Symbol other_robot_symbol = separator_symbols.first;
+      int other_robot_id = (int)(other_robot_symbol.chr() - 97);
+
+      if (rid == other_robot_id) {
+         int other_robot_pose_id = other_robot_symbol.index();
+         bool optimizer_is_initialized = optimizer_->isRobotInitialized();
+
+         buzzobj_t b_individual_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+
+         TablePut(b_individual_estimate, "receiver_robot_id", other_robot_id);
+         TablePut(b_individual_estimate, "receiver_robot_pose_id", other_robot_pose_id);
+         TablePut(b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
+
+         gtsam::Vector rotation_estimate = optimizer_->linearizedRotationAt(separator_symbols.second.key());
+         buzzobj_t b_individual_estimate_rotation = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+
+         for (int rotation_elem_index = 0; rotation_elem_index < 9; rotation_elem_index++) {
+            TablePut(b_individual_estimate_rotation, rotation_elem_index, rotation_estimate[rotation_elem_index]);
+         }         
+
+         TablePut(b_individual_estimate, "rotation_estimate", b_individual_estimate_rotation);
+
+         TablePut(b_rotation_estimates, table_size, b_individual_estimate);
+         table_size++;
+      }
+
+   }
+
+   // Register positioning data table as global symbol
+   Register("rotation_estimates_to_send", b_rotation_estimates);
 }
 
 /****************************************/
