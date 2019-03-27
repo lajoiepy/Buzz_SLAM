@@ -150,9 +150,78 @@ static int BuzzComputeAndUpdateRotationEstimatesToSend(buzzvm_t vm){
 /****************************************/
 /****************************************/
 
-static int BuzzUpdateNeighborRotationEstimatesToSend(buzzvm_t vm){
+static int BuzzUpdateNeighborRotationEstimates(buzzvm_t vm){
 
-   
+   buzzvm_lnum_assert(vm, 1);
+
+   buzzvm_lload(vm, 1);
+
+   buzzvm_type_assert(vm, 1, BUZZTYPE_TABLE);
+
+   std::vector<std::vector<rotation_estimate_t>> received_rotation_estimates;
+
+   buzzobj_t b_rotation_estimates_table = buzzvm_stack_at(vm, 1);
+
+   for (int32_t i = 0; i < buzzdict_size(b_rotation_estimates_table->t.value); ++i) {
+      buzzvm_dup(vm);
+      buzzvm_pushi(vm, i);
+      buzzvm_tget(vm);
+      buzzobj_t b_rotation_estimates_from_robot_i = buzzvm_stack_at(vm, 1);
+
+      received_rotation_estimates.emplace_back(std::vector<rotation_estimate_t>());
+      for (int32_t j = 0; j < buzzdict_size(b_rotation_estimates_from_robot_i->t.value); ++j) {
+         buzzvm_dup(vm);
+         buzzvm_pushi(vm, j);
+         buzzvm_tget(vm);
+         buzzobj_t b_individual_rotation_estimate_j = buzzvm_stack_at(vm, 1);
+
+         rotation_estimate_t rotation_estimate;
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_robot_id", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_receiver_robot_id = buzzvm_stack_at(vm, 1);
+         rotation_estimate.receiver_robot_id = b_receiver_robot_id->i.value;
+         buzzvm_pop(vm);
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_pose_id", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_receiver_pose_id = buzzvm_stack_at(vm, 1);
+         buzzvm_pop(vm);
+         rotation_estimate.receiver_pose_id = b_receiver_pose_id->i.value;
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_robot_is_initialized", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_sender_robot_is_initialized = buzzvm_stack_at(vm, 1);
+         buzzvm_pop(vm);
+         rotation_estimate.sender_robot_is_initialized = (bool)b_sender_robot_is_initialized->i.value;
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "rotation_estimate", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_rotation_estimate = buzzvm_stack_at(vm, 1);
+         for (int32_t k = 0; k < buzzdict_size(b_rotation_estimate->t.value); ++k) {
+            buzzvm_dup(vm);
+            buzzvm_pushi(vm, k);
+            buzzvm_tget(vm);
+            buzzobj_t b_rotation_matrix_elem = buzzvm_stack_at(vm, 1);
+            buzzvm_pop(vm);
+            rotation_estimate.rotation_matrix[k] = b_rotation_matrix_elem->f.value;
+         }
+         buzzvm_pop(vm);
+         buzzvm_pop(vm);
+         received_rotation_estimates.at(i).emplace_back(rotation_estimate);
+      }
+      buzzvm_pop(vm);
+   }
+
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborRotationEstimates(received_rotation_estimates);
 
    return buzzvm_ret0(vm);
 }
@@ -617,7 +686,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
    // for each loop closure
    //  Key, linearized rotation, is init
    int table_size = 0;
-   for (const std::pair<gtsam::Symbol, gtsam::Symbol>& separator_symbols: optimizer_->separatorsSymbols()){
+   for (const std::pair<gtsam::Symbol, gtsam::Symbol>& separator_symbols: optimizer_->separatorsSymbols()) {
 
       gtsam::Symbol other_robot_symbol = separator_symbols.first;
       int other_robot_id = (int)(other_robot_symbol.chr() - 97);
@@ -629,7 +698,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
          buzzobj_t b_individual_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
 
          TablePut(b_individual_estimate, "receiver_robot_id", other_robot_id);
-         TablePut(b_individual_estimate, "receiver_robot_pose_id", other_robot_pose_id);
+         TablePut(b_individual_estimate, "receiver_pose_id", other_robot_pose_id);
          TablePut(b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
 
          gtsam::Vector rotation_estimate = optimizer_->linearizedRotationAt(separator_symbols.second.key());
@@ -654,7 +723,24 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::OptimizeRotationsIteration() {
+void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vector<std::vector<rotation_estimate_t>>& rotation_estimates_from_all_robot) {
+   for (auto rotation_estimates_from_one_robot : rotation_estimates_from_all_robot) {
+      for (auto rotation_estimate : rotation_estimates_from_one_robot) {
+         gtsam::Symbol symbol((unsigned char)(rotation_estimate.receiver_robot_id+97), rotation_estimate.receiver_pose_id);
+         gtsam::Vector rotation_matrix_vector(9);
+         rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
+                                 rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
+                                 rotation_estimate.rotation_matrix[6], rotation_estimate.rotation_matrix[7], rotation_estimate.rotation_matrix[8];
+         optimizer_->updateNeighborLinearizedRotations(symbol.key(), rotation_matrix_vector);
+         optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); 
+      }
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::OptimizeRotationsEndIteration() {
 
    // Stopping condition
    // Change optimizer state
@@ -707,7 +793,7 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    buzzvm_gstore(m_tBuzzVM);
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_rotation_estimates", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborRotationEstimatesToSend));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborRotationEstimates));
    buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;

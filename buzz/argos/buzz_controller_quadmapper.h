@@ -16,8 +16,20 @@
 #include <distributed_mapper/distributed_mapper.h>
 
 using namespace argos;
-
+/*
+*  Enum of all the possible state of the optimizer
+*/
 enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimation, End };
+
+/*
+*  Rotation estimate message
+*/
+typedef struct {
+   int receiver_robot_id;
+   int receiver_pose_id;
+   bool sender_robot_is_initialized;
+   double rotation_matrix[9];
+} rotation_estimate_t;
 
 /*
 * This class should not be instanciated, you should use its children (with or without sensing)
@@ -55,6 +67,8 @@ public:
 
    void ComputeAndUpdateRotationEstimatesToSend(const int& rid);
 
+   void UpdateNeighborRotationEstimates(const std::vector<std::vector<rotation_estimate_t>>& rotation_estimates);
+
 protected:
 
    void UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
@@ -86,7 +100,7 @@ protected:
 
    std::vector<size_t> FlaggedInitializationOrdering();
 
-   void OptimizeRotationsIteration();
+   void OptimizeRotationsEndIteration();
 
    void UpdateLocalEstimates();
 
