@@ -226,6 +226,14 @@ static int BuzzUpdateNeighborRotationEstimates(buzzvm_t vm){
    return buzzvm_ret0(vm);
 }
 
+/****************************************/
+/****************************************/
+
+static int BuzzEstimateRotationAndUpdateRotation(buzzvm_t vm) {
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->EstimateRotationAndUpdateRotation();
+}
 
 /****************************************/
 /****************************************/
@@ -740,6 +748,17 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
 /****************************************/
 /****************************************/
 
+void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
+   fprintf(stdout, "checkpoint 1\n");
+   optimizer_->estimateRotation();
+   fprintf(stdout, "checkpoint 2\n");
+   optimizer_->updateRotation();
+   fprintf(stdout, "checkpoint 3\n");
+}
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapper::OptimizeRotationsEndIteration() {
 
    // Stopping condition
@@ -794,6 +813,10 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_rotation_estimates", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborRotationEstimates));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "estimate_rotation_and_update_rotation", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzEstimateRotationAndUpdateRotation));
    buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;

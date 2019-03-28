@@ -68,6 +68,8 @@ public:
    void ComputeAndUpdateRotationEstimatesToSend(const int& rid);
 
    void UpdateNeighborRotationEstimates(const std::vector<std::vector<rotation_estimate_t>>& rotation_estimates);
+   
+   void EstimateRotationAndUpdateRotation();
 
 protected:
 
