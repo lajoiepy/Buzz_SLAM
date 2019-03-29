@@ -27,6 +27,8 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    translation_noise_std_ = 0.1;
    maximum_number_of_optimization_iterations_ = 1000;
    optimization_phase_length_ = 20;
+   rotation_estimate_change_threshold_ = 1e-1;
+   rotation_estimate_change_threshold_ = 1e-1;
 
    // Initialize attributes
    number_of_poses_ = 0;
@@ -37,7 +39,8 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    local_pose_graph_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
    poses_initial_guess_ = boost::make_shared< gtsam::Values >();
    poses_initial_guess_->insert(previous_symbol_.key(), previous_pose_);
-   current_optimization_iteration_ = 0;
+   current_rotation_iteration_ = 0;
+   current_pose_iteration_ = 0;
 
    // Isotropic noise model
    Eigen::VectorXd sigmas(6);
@@ -496,20 +499,32 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
       case Idle :
          if (number_of_poses_ % optimizer_period_ == 0) {
             optimizer_state_ = OptimizerState::Start;
-            current_optimization_iteration_ = 0;
+            current_rotation_iteration_ = 0;
+            current_pose_iteration_ = 0;
             neighbors_within_communication_range_.clear();
          }
          break;
       case Start :
          StartPoseGraphOptimization();
+         optimizer_state_ = OptimizerState::RotationEstimation;
          break;
       case RotationEstimation :
-         if (number_of_poses_ % (optimizer_period_ + optimization_phase_length_) == 0) {
-            optimizer_state_ = OptimizerState::End;
+         current_rotation_iteration_++;
+         if (RotationEstimationStoppingConditions()) {
+            // Change optimizer state
+            optimizer_state_ = OptimizerState::PoseEstimationInitialization;
          }
          break;
+      case PoseEstimationInitialization :
+         InitializePoseEstimation();
+         optimizer_state_ = OptimizerState::PoseEstimation;
+         break;
       case PoseEstimation :
-
+         current_pose_iteration_++;
+         if (PoseEstimationStoppingConditions()) {
+            // Change optimizer state
+            optimizer_state_ = OptimizerState::End;
+         }
          break;
       case End :
 
@@ -604,7 +619,7 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
 
    disconnected_graph_ = true;
 
-   optimizer_->setFlaggedInit(true);
+   optimizer_->setFlaggedInit(false); // TODO: implement flagged initialization
    
    optimizer_->setUpdateType(distributed_mapper::DistributedMapper::incUpdate);
    
@@ -629,8 +644,6 @@ void CBuzzControllerQuadMapper::StartPoseGraphOptimization() {
 
    optimizer_->updateInitialized(false);
    optimizer_->clearNeighboringRobotInit();
-
-   optimizer_state_ = OptimizerState::RotationEstimation;
 
 }
 
@@ -743,7 +756,7 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
                                  rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
                                  rotation_estimate.rotation_matrix[6], rotation_estimate.rotation_matrix[7], rotation_estimate.rotation_matrix[8];
          optimizer_->updateNeighborLinearizedRotations(symbol.key(), rotation_matrix_vector);
-         optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); 
+         optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
       }
    }
 }
@@ -752,20 +765,57 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
 /****************************************/
 
 void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
-   fprintf(stdout, "checkpoint 1\n");
    optimizer_->estimateRotation();
-   fprintf(stdout, "checkpoint 2\n");
    optimizer_->updateRotation();
-   fprintf(stdout, "checkpoint 3\n");
 }
 
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::OptimizeRotationsEndIteration() {
-
+bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    // Stopping condition
-   // Change optimizer state
+   double change = optimizer_->latestChange();
+   std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
+   std::cout << "[optimize rotation] Other Known robots (" << robot_id_ << "): " << known_other_robots_.size() << std::endl;
+   if ( current_rotation_iteration_ > optimization_phase_length_ && 
+        ( change < rotation_estimate_change_threshold_ || known_other_robots_.size() == 0 ) ) { // TODO : Add a control barrier to end optimization phase.
+      return true;
+   }
+   return false;
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::InitializePoseEstimation() {
+   optimizer_->convertLinearizedRotationToPoses();
+   gtsam::Values neighbors = optimizer_->neighbors();
+    for(const gtsam::Values::ConstKeyValuePair& key_value: neighbors){
+      gtsam::Key key = key_value.key;
+      // Pick linear rotation estimate from *robot*
+      gtsam::VectorValues lin_rot_estimate_neighbor;
+      lin_rot_estimate_neighbor.insert( key,  optimizer_->neighborsLinearizedRotationsAt(key) );
+      // Make a pose out of it
+      gtsam::Values rot_estimate_neighbor = gtsam::InitializePose3::normalizeRelaxedRotations(lin_rot_estimate_neighbor);
+      gtsam::Values pose_estimate_neighbor = distributed_mapper::evaluation_utils::pose3WithZeroTranslation(rot_estimate_neighbor);
+      // Store it
+      optimizer_->updateNeighbor(key, pose_estimate_neighbor.at<gtsam::Pose3>(key));
+    }
+}
+
+/****************************************/
+/****************************************/
+
+bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
+   // Stopping condition
+   double change = optimizer_->latestChange();
+   std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
+   std::cout << "[optimize pose] Other Known robots (" << robot_id_ << "): " << known_other_robots_.size() << std::endl;
+   if ( current_pose_iteration_ > optimization_phase_length_ && 
+        ( change < pose_estimate_change_threshold_ || known_other_robots_.size() == 0 ) ) { // TODO : Add a control barrier to end optimization phase.
+      return true;
+   }
+   return false;
 }
 
 /****************************************/

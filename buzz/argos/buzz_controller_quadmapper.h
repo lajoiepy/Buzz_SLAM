@@ -21,7 +21,7 @@ namespace buzz_quadmapper {
 /*
 *  Enum of all the possible state of the optimizer
 */
-enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimation, End };
+enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimationInitialization, PoseEstimation, End };
 
 /*
 *  Rotation estimate message
@@ -109,11 +109,15 @@ protected:
 
    std::vector<size_t> FlaggedInitializationOrdering();
 
-   void OptimizeRotationsEndIteration();
+   bool RotationEstimationStoppingConditions();
 
    void UpdateLocalEstimates();
 
    void AddNewKnownRobot(const unsigned char& other_robot_char);
+
+   void InitializePoseEstimation();
+
+   bool PoseEstimationStoppingConditions();
 
 protected:
    // General attributes of the controller
@@ -144,7 +148,7 @@ protected:
 
    bool disconnected_graph_;
 
-   int current_optimization_iteration_;
+   int current_rotation_iteration_, current_pose_iteration_;
 
    OptimizerState optimizer_state_;
 
@@ -158,6 +162,8 @@ protected:
    int maximum_number_of_optimization_iterations_;
 
    int optimization_phase_length_;
+
+   double rotation_estimate_change_threshold_, pose_estimate_change_threshold_;
 
 };
 }
