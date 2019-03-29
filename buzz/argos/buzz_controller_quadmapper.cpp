@@ -25,7 +25,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
    rotation_noise_std_ = 0.01;
    translation_noise_std_ = 0.1;
-   maximum_number_of_optimization_iterations_ = 1000;
+   maximum_number_of_optimization_iterations_ = 30;
    optimization_phase_length_ = 20;
    rotation_estimate_change_threshold_ = 1e-1;
    rotation_estimate_change_threshold_ = 1e-1;
@@ -42,11 +42,12 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    current_rotation_iteration_ = 0;
    current_pose_iteration_ = 0;
 
-   // Isotropic noise model
+   // Isotropic noise models
    Eigen::VectorXd sigmas(6);
    sigmas << rotation_noise_std_, rotation_noise_std_, rotation_noise_std_, 
             translation_noise_std_, translation_noise_std_, translation_noise_std_;
    noise_model_ = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
+   chordal_graph_noise_model_ = gtsam::noiseModel::Isotropic::Variance(12, 1);
 }
 
 /****************************************/
@@ -240,6 +241,123 @@ static int BuzzEstimateRotationAndUpdateRotation(buzzvm_t vm) {
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->EstimateRotationAndUpdateRotation();
 }
 
+/****************************************/
+/****************************************/
+
+static int BuzzComputeAndUpdatePoseEstimatesToSend(buzzvm_t vm){
+
+   buzzvm_lload(vm, 1);
+   
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 1);
+   int rid;
+
+   if(buzz_rid->o.type == BUZZTYPE_INT) rid = buzz_rid->i.value;
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "BuzzComputeAndUpdatePoseEstimatesToSend: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[buzz_rid->o.type]
+         );
+      return vm->state;
+   } 
+
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->ComputeAndUpdatePoseEstimatesToSend(rid);
+
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzUpdateNeighborPoseEstimates(buzzvm_t vm){
+
+   buzzvm_lnum_assert(vm, 1);
+
+   buzzvm_lload(vm, 1);
+
+   buzzvm_type_assert(vm, 1, BUZZTYPE_TABLE);
+
+   std::vector<std::vector<pose_estimate_t>> received_pose_estimates;
+
+   buzzobj_t b_pose_estimates_table = buzzvm_stack_at(vm, 1);
+
+   for (int32_t i = 0; i < buzzdict_size(b_pose_estimates_table->t.value); ++i) {
+      buzzvm_dup(vm);
+      buzzvm_pushi(vm, i);
+      buzzvm_tget(vm);
+      buzzobj_t b_pose_estimates_from_robot_i = buzzvm_stack_at(vm, 1);
+
+      received_pose_estimates.emplace_back(std::vector<pose_estimate_t>());
+      for (int32_t j = 0; j < buzzdict_size(b_pose_estimates_from_robot_i->t.value); ++j) {
+         buzzvm_dup(vm);
+         buzzvm_pushi(vm, j);
+         buzzvm_tget(vm);
+         buzzobj_t b_individual_pose_estimate_j = buzzvm_stack_at(vm, 1);
+
+         pose_estimate_t pose_estimate;
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_robot_id", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_receiver_robot_id = buzzvm_stack_at(vm, 1);
+         pose_estimate.receiver_robot_id = b_receiver_robot_id->i.value;
+         buzzvm_pop(vm);
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_pose_id", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_receiver_pose_id = buzzvm_stack_at(vm, 1);
+         buzzvm_pop(vm);
+         pose_estimate.receiver_pose_id = b_receiver_pose_id->i.value;
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_robot_is_initialized", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_sender_robot_is_initialized = buzzvm_stack_at(vm, 1);
+         buzzvm_pop(vm);
+         pose_estimate.sender_robot_is_initialized = (bool)b_sender_robot_is_initialized->i.value;
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "pose_estimate", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_pose_estimate = buzzvm_stack_at(vm, 1);
+         for (int32_t k = 0; k < buzzdict_size(b_pose_estimate->t.value); ++k) {
+            buzzvm_dup(vm);
+            buzzvm_pushi(vm, k);
+            buzzvm_tget(vm);
+            buzzobj_t b_pose_matrix_elem = buzzvm_stack_at(vm, 1);
+            buzzvm_pop(vm);
+            pose_estimate.pose_data[k] = b_pose_matrix_elem->f.value;
+         }
+         buzzvm_pop(vm);
+         buzzvm_pop(vm);
+         received_pose_estimates.at(i).emplace_back(pose_estimate);
+      }
+      buzzvm_pop(vm);
+   }
+
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborPoseEstimates(received_pose_estimates);
+
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzEstimatePoseAndUpdatePose(buzzvm_t vm) {
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->EstimatePoseAndUpdatePose();
+}
 /****************************************/
 /****************************************/
 
@@ -512,12 +630,9 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          current_rotation_iteration_++;
          if (RotationEstimationStoppingConditions()) {
             // Change optimizer state
-            optimizer_state_ = OptimizerState::PoseEstimationInitialization;
+            optimizer_state_ = OptimizerState::PoseEstimation;
+            InitializePoseEstimation();
          }
-         break;
-      case PoseEstimationInitialization :
-         InitializePoseEstimation();
-         optimizer_state_ = OptimizerState::PoseEstimation;
          break;
       case PoseEstimation :
          current_pose_iteration_++;
@@ -527,8 +642,8 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          }
          break;
       case End :
-         //EndOptimization();
-         //EvaluateCurrentEstimate();
+         EndOptimization();
+         EvaluateCurrentEstimate();
          optimizer_state_ = OptimizerState::Idle;
          break;
    }
@@ -641,7 +756,7 @@ void CBuzzControllerQuadMapper::StartPoseGraphOptimization() {
    OutliersFiltering();
 
    // TODO: Add flagged initialization
-   std::vector<size_t> ordering = TrivialOrdering();
+   // std::vector<size_t> ordering = TrivialOrdering();
 
    optimizer_->updateInitialized(false);
    optimizer_->clearNeighboringRobotInit();
@@ -768,6 +883,7 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
 void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
    optimizer_->estimateRotation();
    optimizer_->updateRotation();
+   optimizer_->updateInitialized(true);
 }
 
 /****************************************/
@@ -777,9 +893,9 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    // Stopping condition
    double change = optimizer_->latestChange();
    std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
-   std::cout << "[optimize rotation] Other Known robots (" << robot_id_ << "): " << known_other_robots_.size() << std::endl;
-   if ( current_rotation_iteration_ > optimization_phase_length_ && 
-        ( change < rotation_estimate_change_threshold_ || known_other_robots_.size() == 0 ) ) { // TODO : Add a control barrier to end optimization phase.
+   if ( ( current_rotation_iteration_ > optimization_phase_length_ && 
+         ( change < rotation_estimate_change_threshold_ || known_other_robots_.size() == 0 ) ) || 
+         current_rotation_iteration_ > maximum_number_of_optimization_iterations_ ) { // TODO : Add a control barrier to end optimization phase.
       return true;
    }
    return false;
@@ -802,6 +918,80 @@ void CBuzzControllerQuadMapper::InitializePoseEstimation() {
       // Store it
       optimizer_->updateNeighbor(key, pose_estimate_neighbor.at<gtsam::Pose3>(key));
     }
+
+   // Reset flags for flagged initialization.
+   optimizer_->updateInitialized(false);
+   optimizer_->clearNeighboringRobotInit();
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& rid) {
+
+   // Create empty data table
+   buzzobj_t b_pose_estimates = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+
+   // for each loop closure
+   //  Key, linearized pose, is init
+   int table_size = 0;
+   for (const std::pair<gtsam::Symbol, gtsam::Symbol>& separator_symbols: optimizer_->separatorsSymbols()) {
+
+      gtsam::Symbol other_robot_symbol = separator_symbols.first;
+      int other_robot_id = (int)(other_robot_symbol.chr() - 97);
+
+      if (rid == other_robot_id) {
+         int other_robot_pose_id = other_robot_symbol.index();
+         bool optimizer_is_initialized = optimizer_->isRobotInitialized();
+
+         buzzobj_t b_individual_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+
+         TablePut(b_individual_estimate, "receiver_robot_id", other_robot_id);
+         TablePut(b_individual_estimate, "receiver_pose_id", other_robot_pose_id);
+         TablePut(b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
+
+         gtsam::Vector pose_estimate = optimizer_->linearizedPosesAt(separator_symbols.second.key());
+         buzzobj_t b_individual_estimate_pose = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+
+         for (int pose_elem_index = 0; pose_elem_index < 6; pose_elem_index++) {
+            TablePut(b_individual_estimate_pose, pose_elem_index, pose_estimate[pose_elem_index]);
+         }         
+
+         TablePut(b_individual_estimate, "pose_estimate", b_individual_estimate_pose);
+
+         TablePut(b_pose_estimates, table_size, b_individual_estimate);
+         table_size++;
+      }
+
+   }
+
+   // Register positioning data table as global symbol
+   Register("pose_estimates_to_send", b_pose_estimates);
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<std::vector<pose_estimate_t>>& pose_estimates_from_all_robot) {
+   for (auto pose_estimates_from_one_robot : pose_estimates_from_all_robot) {
+      for (auto pose_estimate : pose_estimates_from_one_robot) {
+         gtsam::Symbol symbol((unsigned char)(pose_estimate.receiver_robot_id+97), pose_estimate.receiver_pose_id);
+         gtsam::Vector pose_data_vector(6);
+         pose_data_vector << pose_estimate.pose_data[0], pose_estimate.pose_data[1], pose_estimate.pose_data[2], 
+                                 pose_estimate.pose_data[3], pose_estimate.pose_data[4], pose_estimate.pose_data[5];
+         optimizer_->updateNeighborLinearizedPoses(symbol.key(), pose_data_vector);
+         optimizer_->updateNeighboringRobotInitialized(symbol.chr(), pose_estimate.sender_robot_is_initialized); // Used only with flagged initialization
+      }
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
+   optimizer_->estimatePoses();
+   optimizer_->updatePoses();
+   optimizer_->updateInitialized(true);
 }
 
 /****************************************/
@@ -811,9 +1001,9 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    // Stopping condition
    double change = optimizer_->latestChange();
    std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
-   std::cout << "[optimize pose] Other Known robots (" << robot_id_ << "): " << known_other_robots_.size() << std::endl;
-   if ( current_pose_iteration_ > optimization_phase_length_ && 
-        ( change < pose_estimate_change_threshold_ || known_other_robots_.size() == 0 ) ) { // TODO : Add a control barrier to end optimization phase.
+   if ( ( current_pose_iteration_ > optimization_phase_length_ && 
+         ( change < pose_estimate_change_threshold_ || known_other_robots_.size() == 0 ) ) || 
+        current_pose_iteration_ > maximum_number_of_optimization_iterations_ ) { // TODO : Add a control barrier to end optimization phase.
       return true;
    }
    return false;
@@ -831,9 +1021,9 @@ void CBuzzControllerQuadMapper::EndOptimization() {
 
 double CBuzzControllerQuadMapper::EvaluateCurrentEstimate() {
    gtsam::NonlinearFactorGraph chordal_graph = distributed_mapper::evaluation_utils::convertToChordalGraph(
-        *local_pose_graph_, noise_model_, false);
-   double distributed_error = chordal_graph.error(optimizer_->currentEstimate());
-   std::cout << "Robot " << robot_id_ << ", Distributed Error: " << distributed_error << std::endl;
+        *local_pose_graph_, chordal_graph_noise_model_, false);
+   double distributed_error = 0; //chordal_graph.error(optimizer_->currentEstimate());
+   //std::cout << "Robot " << robot_id_ << ", Distributed Error: " << distributed_error << std::endl;
    return distributed_error;
 }
 
@@ -882,13 +1072,25 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "compute_and_update_rotation_estimates_to_send", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzComputeAndUpdateRotationEstimatesToSend));
    buzzvm_gstore(m_tBuzzVM);
+   
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "compute_and_update_pose_estimates_to_send", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzComputeAndUpdatePoseEstimatesToSend));
+   buzzvm_gstore(m_tBuzzVM);
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_rotation_estimates", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborRotationEstimates));
    buzzvm_gstore(m_tBuzzVM);
 
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_pose_estimates", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborPoseEstimates));
+   buzzvm_gstore(m_tBuzzVM);
+
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "estimate_rotation_and_update_rotation", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzEstimateRotationAndUpdateRotation));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "estimate_pose_and_update_pose", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzEstimatePoseAndUpdatePose));
    buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;

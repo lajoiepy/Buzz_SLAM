@@ -21,7 +21,7 @@ namespace buzz_quadmapper {
 /*
 *  Enum of all the possible state of the optimizer
 */
-enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimationInitialization, PoseEstimation, End };
+enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimation, End };
 
 /*
 *  Rotation estimate message
@@ -32,6 +32,16 @@ typedef struct {
    bool sender_robot_is_initialized;
    double rotation_matrix[9];
 } rotation_estimate_t;
+
+/*
+*  Pose estimate message
+*/
+typedef struct {
+   int receiver_robot_id;
+   int receiver_pose_id;
+   bool sender_robot_is_initialized;
+   double pose_data[6];
+} pose_estimate_t;
 
 /*
 * Buzz controller to support 3D robust distributed pose graph optimization.
@@ -72,9 +82,15 @@ public:
 
    void ComputeAndUpdateRotationEstimatesToSend(const int& rid);
 
+   void ComputeAndUpdatePoseEstimatesToSend(const int& rid);
+
    void UpdateNeighborRotationEstimates(const std::vector<std::vector<rotation_estimate_t>>& rotation_estimates);
+
+   void UpdateNeighborPoseEstimates(const std::vector<std::vector<pose_estimate_t>>& pose_estimates);
    
    void EstimateRotationAndUpdateRotation();
+
+   void EstimatePoseAndUpdatePose();
 
 protected:
 
@@ -162,6 +178,8 @@ protected:
    double rotation_noise_std_, translation_noise_std_;
 
    gtsam::SharedNoiseModel noise_model_;
+
+   gtsam::noiseModel::Isotropic::shared_ptr chordal_graph_noise_model_;
 
    int maximum_number_of_optimization_iterations_;
 
