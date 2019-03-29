@@ -119,6 +119,10 @@ protected:
 
    bool PoseEstimationStoppingConditions();
 
+   void EndOptimization();
+
+   double EvaluateCurrentEstimate();
+
 protected:
    // General attributes of the controller
    uint16_t robot_id_;

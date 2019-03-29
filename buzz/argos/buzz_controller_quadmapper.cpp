@@ -527,7 +527,8 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          }
          break;
       case End :
-
+         //EndOptimization();
+         //EvaluateCurrentEstimate();
          optimizer_state_ = OptimizerState::Idle;
          break;
    }
@@ -816,6 +817,24 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
       return true;
    }
    return false;
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::EndOptimization() {
+   optimizer_->retractPose3Global();
+}
+
+/****************************************/
+/****************************************/
+
+double CBuzzControllerQuadMapper::EvaluateCurrentEstimate() {
+   gtsam::NonlinearFactorGraph chordal_graph = distributed_mapper::evaluation_utils::convertToChordalGraph(
+        *local_pose_graph_, noise_model_, false);
+   double distributed_error = chordal_graph.error(optimizer_->currentEstimate());
+   std::cout << "Robot " << robot_id_ << ", Distributed Error: " << distributed_error << std::endl;
+   return distributed_error;
 }
 
 /****************************************/
