@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+namespace buzz_quadmapper {
 /****************************************/
 /****************************************/
 
@@ -46,6 +47,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
 }
 
 /****************************************/
+/*            Buzz Closures             */
 /****************************************/
 
 static int BuzzInitOptimizer(buzzvm_t vm){
@@ -430,6 +432,7 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
 }
 
 /****************************************/
+/*             Class methods            */
 /****************************************/
 
 OptimizerState CBuzzControllerQuadMapper::GetOptimizerState() {
@@ -826,3 +829,4 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
 /****************************************/
 
 REGISTER_CONTROLLER(CBuzzControllerQuadMapper, "buzz_controller_quadmapper");
+}

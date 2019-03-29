@@ -16,6 +16,8 @@
 #include <distributed_mapper/distributed_mapper.h>
 
 using namespace argos;
+
+namespace buzz_quadmapper {
 /*
 *  Enum of all the possible state of the optimizer
 */
@@ -32,7 +34,8 @@ typedef struct {
 } rotation_estimate_t;
 
 /*
-* This class should not be instanciated, you should use its children (with or without sensing)
+* Buzz controller to support 3D robust distributed pose graph optimization.
+* This class should not be instanciated, you should use its derived classes (with or without sensing)
 */
 class CBuzzControllerQuadMapper : public CBuzzControllerSpiri {
 
@@ -44,8 +47,10 @@ public:
 
    virtual void Init(TConfigurationNode& t_node);
 
+   // Control functions
    void SetNextPosition(const CVector3& c_heading);
 
+   // Functions related to the measurements
    void AddSeparatorToLocalGraph( const int& robot_1_id,
                                     const int& robot_2_id,
                                     const int& robot_1_pose_id,
@@ -73,6 +78,7 @@ public:
 
 protected:
 
+   // Functions for link with buzz VM
    void UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
                                                 const int& robot_2_id,
                                                 const int& robot_1_pose_id,
@@ -87,11 +93,12 @@ protected:
 
    virtual buzzvm_state RegisterFunctions();
 
+   // Utility functions
    void WriteDataset(const uint16_t& robot_id);
 
+   // Wrapper function related to distributed_mapper
    void IncrementNumberOfPosesAndUpdateState();
 
-   // Wrapper function related to distributed_mapper
    void StartPoseGraphOptimization();
 
    void UpdateOptimizer();
@@ -109,26 +116,31 @@ protected:
    void AddNewKnownRobot(const unsigned char& other_robot_char);
 
 protected:
+   // General attributes of the controller
+   uint16_t robot_id_;
 
+   unsigned char robot_id_char_;
+
+   // Measurements
    boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_;
 
    boost::shared_ptr<gtsam::Values> poses_initial_guess_;
 
    gtsam::GraphAndValues graph_and_values_;
 
+   // Current state of the controller
    gtsam::Symbol previous_symbol_;
 
    gtsam::Pose3 previous_pose_;
 
    int number_of_poses_;
 
-   uint16_t robot_id_;
-
-   unsigned char robot_id_char_;
-
-   boost::shared_ptr<distributed_mapper::DistributedMapper> optimizer_;
-
    std::set<unsigned char> known_other_robots_;
+
+   std::vector<int> neighbors_within_communication_range_;
+
+   // Distributed mapping attributes
+   boost::shared_ptr<distributed_mapper::DistributedMapper> optimizer_;
 
    bool disconnected_graph_;
 
@@ -137,8 +149,6 @@ protected:
    OptimizerState optimizer_state_;
 
    int optimizer_period_;
-
-   std::vector<int> neighbors_within_communication_range_;
 
    // Constants that should be parameters in the future
    double rotation_noise_std_, translation_noise_std_;
@@ -150,5 +160,5 @@ protected:
    int optimization_phase_length_;
 
 };
-
+}
 #endif

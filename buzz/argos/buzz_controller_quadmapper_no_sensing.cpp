@@ -4,6 +4,7 @@
 #include <time.h>
 #include <cmath> 
 
+namespace buzz_quadmapper {
 /****************************************/
 /****************************************/
 
@@ -46,6 +47,7 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
 }
 
 /****************************************/
+/*            Buzz Closures             */
 /****************************************/
 
 static int BuzzComputeFakeRendezVousSeparator(buzzvm_t vm) {
@@ -151,6 +153,7 @@ static int BuzzMoveForwardFakeOdometry(buzzvm_t vm) {
 }
 
 /****************************************/
+/*             Class methods            */
 /****************************************/
 
 int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& distance, const int& simulation_time_divider) {
@@ -394,3 +397,5 @@ buzzvm_state CBuzzControllerQuadMapperNoSensing::RegisterFunctions() {
 /****************************************/
 
 REGISTER_CONTROLLER(CBuzzControllerQuadMapperNoSensing, "buzz_controller_quadmapper_no_sensing");
+
+}
