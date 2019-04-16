@@ -29,6 +29,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    optimization_phase_length_ = 20;
    rotation_estimate_change_threshold_ = 1e-1;
    rotation_estimate_change_threshold_ = 1e-1;
+   pose_estimate_change_threshold_ = 1e-1;
 
    // Initialize attributes
    number_of_poses_ = 0;
