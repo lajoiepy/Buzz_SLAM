@@ -185,18 +185,18 @@ static int BuzzUpdateNeighborRotationEstimates(buzzvm_t vm){
          rotation_estimate_t rotation_estimate;
 
          buzzvm_dup(vm);
-         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_robot_id", 1));
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_robot_id", 1));
          buzzvm_tget(vm);
-         buzzobj_t b_receiver_robot_id = buzzvm_stack_at(vm, 1);
-         rotation_estimate.receiver_robot_id = b_receiver_robot_id->i.value;
+         buzzobj_t b_sender_robot_id = buzzvm_stack_at(vm, 1);
+         rotation_estimate.sender_robot_id = b_sender_robot_id->i.value;
          buzzvm_pop(vm);
 
          buzzvm_dup(vm);
-         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_pose_id", 1));
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_pose_id", 1));
          buzzvm_tget(vm);
-         buzzobj_t b_receiver_pose_id = buzzvm_stack_at(vm, 1);
+         buzzobj_t b_sender_pose_id = buzzvm_stack_at(vm, 1);
          buzzvm_pop(vm);
-         rotation_estimate.receiver_pose_id = b_receiver_pose_id->i.value;
+         rotation_estimate.sender_pose_id = b_sender_pose_id->i.value;
 
          buzzvm_dup(vm);
          buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_robot_is_initialized", 1));
@@ -833,13 +833,13 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
       int other_robot_id = (int)(other_robot_symbol.chr() - 97);
 
       if (rid == other_robot_id) {
-         int other_robot_pose_id = other_robot_symbol.index();
          bool optimizer_is_initialized = optimizer_->isRobotInitialized();
 
          buzzobj_t b_individual_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
 
-         TablePut(b_individual_estimate, "receiver_robot_id", other_robot_id);
-         TablePut(b_individual_estimate, "receiver_pose_id", other_robot_pose_id);
+         TablePut(b_individual_estimate, "sender_robot_id", robot_id_);
+         int robot_pose_id = separator_symbols.second.index();
+         TablePut(b_individual_estimate, "sender_pose_id", robot_pose_id);
          TablePut(b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
 
          gtsam::Vector rotation_estimate = optimizer_->linearizedRotationAt(separator_symbols.second.key());
@@ -867,7 +867,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
 void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vector<std::vector<rotation_estimate_t>>& rotation_estimates_from_all_robot) {
    for (auto rotation_estimates_from_one_robot : rotation_estimates_from_all_robot) {
       for (auto rotation_estimate : rotation_estimates_from_one_robot) {
-         gtsam::Symbol symbol((unsigned char)(rotation_estimate.receiver_robot_id+97), rotation_estimate.receiver_pose_id);
+         gtsam::Symbol symbol((unsigned char)(rotation_estimate.sender_robot_id+97), rotation_estimate.sender_pose_id);
          gtsam::Vector rotation_matrix_vector(9);
          rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
                                  rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
@@ -908,7 +908,7 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
 void CBuzzControllerQuadMapper::InitializePoseEstimation() {
    optimizer_->convertLinearizedRotationToPoses();
    gtsam::Values neighbors = optimizer_->neighbors();
-    for(const gtsam::Values::ConstKeyValuePair& key_value: neighbors){
+   for(const gtsam::Values::ConstKeyValuePair& key_value: neighbors){
       gtsam::Key key = key_value.key;
       // Pick linear rotation estimate from *robot*
       gtsam::VectorValues lin_rot_estimate_neighbor;
@@ -918,7 +918,7 @@ void CBuzzControllerQuadMapper::InitializePoseEstimation() {
       gtsam::Values pose_estimate_neighbor = distributed_mapper::evaluation_utils::pose3WithZeroTranslation(rot_estimate_neighbor);
       // Store it
       optimizer_->updateNeighbor(key, pose_estimate_neighbor.at<gtsam::Pose3>(key));
-    }
+   }
 
    // Reset flags for flagged initialization.
    optimizer_->updateInitialized(false);

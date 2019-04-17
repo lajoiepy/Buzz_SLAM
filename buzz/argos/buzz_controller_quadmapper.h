@@ -27,8 +27,8 @@ enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimation, End };
 *  Rotation estimate message
 */
 typedef struct {
-   int receiver_robot_id;
-   int receiver_pose_id;
+   int sender_robot_id;
+   int sender_pose_id;
    bool sender_robot_is_initialized;
    double rotation_matrix[9];
 } rotation_estimate_t;
