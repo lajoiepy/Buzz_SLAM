@@ -772,6 +772,12 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
    // Load subgraphs
    optimizer_->loadSubgraphAndCreateSubgraphEdge(graph_and_values_);
 
+   // Add prior to the first robot
+   if (robot_id_ == 0) {
+      gtsam::Key first_key = gtsam::KeyVector(poses_initial_guess_->keys()).at(0);
+      optimizer_->addPrior(first_key, poses_initial_guess_->at<gtsam::Pose3>(first_key), noise_model_);
+   }
+   
    // Check for graph connectivity
    std::set<char> neighboring_robots = optimizer_->getNeighboringChars();
    if (neighboring_robots.size() > 0) {
