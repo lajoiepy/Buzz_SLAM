@@ -37,8 +37,8 @@ typedef struct {
 *  Pose estimate message
 */
 typedef struct {
-   int receiver_robot_id;
-   int receiver_pose_id;
+   int sender_robot_id;
+   int sender_pose_id;
    bool sender_robot_is_initialized;
    double pose_data[6];
 } pose_estimate_t;

@@ -25,7 +25,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
    rotation_noise_std_ = 0.01;
    translation_noise_std_ = 0.1;
-   maximum_number_of_optimization_iterations_ = 30;
+   maximum_number_of_optimization_iterations_ = 50;
    optimization_phase_length_ = 20;
    rotation_estimate_change_threshold_ = 1e-1;
    rotation_estimate_change_threshold_ = 1e-1;
@@ -303,18 +303,18 @@ static int BuzzUpdateNeighborPoseEstimates(buzzvm_t vm){
          pose_estimate_t pose_estimate;
 
          buzzvm_dup(vm);
-         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_robot_id", 1));
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_robot_id", 1));
          buzzvm_tget(vm);
-         buzzobj_t b_receiver_robot_id = buzzvm_stack_at(vm, 1);
-         pose_estimate.receiver_robot_id = b_receiver_robot_id->i.value;
+         buzzobj_t b_sender_robot_id = buzzvm_stack_at(vm, 1);
+         pose_estimate.sender_robot_id = b_sender_robot_id->i.value;
          buzzvm_pop(vm);
 
          buzzvm_dup(vm);
-         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_pose_id", 1));
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_pose_id", 1));
          buzzvm_tget(vm);
-         buzzobj_t b_receiver_pose_id = buzzvm_stack_at(vm, 1);
+         buzzobj_t b_sender_pose_id = buzzvm_stack_at(vm, 1);
          buzzvm_pop(vm);
-         pose_estimate.receiver_pose_id = b_receiver_pose_id->i.value;
+         pose_estimate.sender_pose_id = b_sender_pose_id->i.value;
 
          buzzvm_dup(vm);
          buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_robot_is_initialized", 1));
@@ -948,13 +948,13 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
       int other_robot_id = (int)(other_robot_symbol.chr() - 97);
 
       if (rid == other_robot_id) {
-         int other_robot_pose_id = other_robot_symbol.index();
          bool optimizer_is_initialized = optimizer_->isRobotInitialized();
 
          buzzobj_t b_individual_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
 
-         TablePut(b_individual_estimate, "receiver_robot_id", other_robot_id);
-         TablePut(b_individual_estimate, "receiver_pose_id", other_robot_pose_id);
+         TablePut(b_individual_estimate, "sender_robot_id", robot_id_);
+         int robot_pose_id = separator_symbols.second.index();
+         TablePut(b_individual_estimate, "sender_pose_id", robot_pose_id);
          TablePut(b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
 
          gtsam::Vector pose_estimate = optimizer_->linearizedPosesAt(separator_symbols.second.key());
@@ -982,7 +982,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
 void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<std::vector<pose_estimate_t>>& pose_estimates_from_all_robot) {
    for (auto pose_estimates_from_one_robot : pose_estimates_from_all_robot) {
       for (auto pose_estimate : pose_estimates_from_one_robot) {
-         gtsam::Symbol symbol((unsigned char)(pose_estimate.receiver_robot_id+97), pose_estimate.receiver_pose_id);
+         gtsam::Symbol symbol((unsigned char)(pose_estimate.sender_robot_id+97), pose_estimate.sender_pose_id);
          gtsam::Vector pose_data_vector(6);
          pose_data_vector << pose_estimate.pose_data[0], pose_estimate.pose_data[1], pose_estimate.pose_data[2], 
                                  pose_estimate.pose_data[3], pose_estimate.pose_data[4], pose_estimate.pose_data[5];
