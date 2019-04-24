@@ -25,9 +25,6 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
    rotation_noise_std_ = 0.01;
    translation_noise_std_ = 0.1;
-   maximum_number_of_optimization_iterations_ = 50;
-   optimization_phase_length_ = 20;
-   rotation_estimate_change_threshold_ = 1e-1;
    rotation_estimate_change_threshold_ = 1e-1;
    pose_estimate_change_threshold_ = 1e-1;
 
@@ -554,6 +551,92 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
 }
 
 /****************************************/
+/****************************************/
+
+static int BuzzRotationEstimationStoppingConditions(buzzvm_t vm){
+
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   bool is_finished = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->RotationEstimationStoppingConditions();
+   buzzvm_pushi(vm, is_finished);
+
+   return buzzvm_ret1(vm);
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzPoseEstimationStoppingConditions(buzzvm_t vm){
+
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   bool is_finished = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->PoseEstimationStoppingConditions();
+   buzzvm_pushi(vm, is_finished);
+
+   return buzzvm_ret1(vm);
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzNeighborRotationEstimationIsFinished(buzzvm_t vm){
+
+   buzzvm_lload(vm, 1);
+   
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 1);
+   int rid;
+
+   if(buzz_rid->o.type == BUZZTYPE_INT) rid = buzz_rid->i.value;
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "BuzzNeighborRotationEstimationIsFinished: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[buzz_rid->o.type]
+         );
+      return vm->state;
+   } 
+
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborRotationEstimationIsFinished(rid);
+
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzNeighborPoseEstimationIsFinished(buzzvm_t vm){
+
+   buzzvm_lload(vm, 1);
+   
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 1);
+   int rid;
+
+   if(buzz_rid->o.type == BUZZTYPE_INT) rid = buzz_rid->i.value;
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "BuzzNeighborPoseEstimationIsFinished: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[buzz_rid->o.type]
+         );
+      return vm->state;
+   } 
+
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborPoseEstimationIsFinished(rid);
+
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
 /*             Class methods            */
 /****************************************/
 
@@ -621,6 +704,8 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             current_rotation_iteration_ = 0;
             current_pose_iteration_ = 0;
             neighbors_within_communication_range_.clear();
+            neighbors_rotation_estimation_phase_is_finished_.clear();
+            neighbors_pose_estimation_phase_is_finished_.clear();
          }
          break;
       case Start :
@@ -629,17 +714,23 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          break;
       case RotationEstimation :
          current_rotation_iteration_++;
-         if (RotationEstimationStoppingConditions()) {
+         if (RotationEstimationStoppingBarrier()) {
             // Change optimizer state
             optimizer_state_ = OptimizerState::PoseEstimation;
             InitializePoseEstimation();
+         } else {
+            // Reinitialize neighbors states information
+            SetRotationEstimationIsFinishedFlagsToFalse();
          }
          break;
       case PoseEstimation :
          current_pose_iteration_++;
-         if (PoseEstimationStoppingConditions()) {
+         if (PoseEstimationStoppingBarrier()) {
             // Change optimizer state
             optimizer_state_ = OptimizerState::End;
+         } else {
+            // Reinitialize neighbors states information
+            SetPoseEstimationIsFinishedFlagsToFalse();
          }
          break;
       case End :
@@ -745,6 +836,10 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
    optimizer_state_ = OptimizerState::Idle;
 
    optimizer_period_ = period;
+
+   rotation_estimation_phase_is_finished_ = false;
+
+   pose_estimation_phase_is_finished_ = false;
 }
 
 /****************************************/
@@ -820,6 +915,8 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
 
 void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& rid) {
    neighbors_within_communication_range_.emplace_back(rid);
+   neighbors_rotation_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
+   neighbors_pose_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
 }
 
 /****************************************/
@@ -871,8 +968,8 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
 /****************************************/
 
 void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vector<std::vector<rotation_estimate_t>>& rotation_estimates_from_all_robot) {
-   for (auto rotation_estimates_from_one_robot : rotation_estimates_from_all_robot) {
-      for (auto rotation_estimate : rotation_estimates_from_one_robot) {
+   for (const auto& rotation_estimates_from_one_robot : rotation_estimates_from_all_robot) {
+      for (const auto& rotation_estimate : rotation_estimates_from_one_robot) {
          gtsam::Symbol symbol((unsigned char)(rotation_estimate.sender_robot_id+97), rotation_estimate.sender_pose_id);
          gtsam::Vector rotation_matrix_vector(9);
          rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
@@ -898,14 +995,24 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
 
 bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    // Stopping condition
+   rotation_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
    std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
-   if ( ( current_rotation_iteration_ > optimization_phase_length_ && 
-         ( change < rotation_estimate_change_threshold_ || known_other_robots_.size() == 0 ) ) || 
-         current_rotation_iteration_ > maximum_number_of_optimization_iterations_ ) { // TODO : Add a control barrier to end optimization phase.
-      return true;
+   if(change < rotation_estimate_change_threshold_ && current_rotation_iteration_ != 0) {
+      rotation_estimation_phase_is_finished_ = true;
    }
-   return false;
+   return rotation_estimation_phase_is_finished_;
+}
+
+/****************************************/
+/****************************************/
+
+bool CBuzzControllerQuadMapper::RotationEstimationStoppingBarrier() {
+   bool stop_rotation_estimation = rotation_estimation_phase_is_finished_;
+   for (const auto& is_finished : neighbors_rotation_estimation_phase_is_finished_) {
+      stop_rotation_estimation &= is_finished.second;
+   }   
+   return stop_rotation_estimation;
 }
 
 /****************************************/
@@ -980,8 +1087,8 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
 /****************************************/
 
 void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<std::vector<pose_estimate_t>>& pose_estimates_from_all_robot) {
-   for (auto pose_estimates_from_one_robot : pose_estimates_from_all_robot) {
-      for (auto pose_estimate : pose_estimates_from_one_robot) {
+   for (const auto& pose_estimates_from_one_robot : pose_estimates_from_all_robot) {
+      for (const auto& pose_estimate : pose_estimates_from_one_robot) {
          gtsam::Symbol symbol((unsigned char)(pose_estimate.sender_robot_id+97), pose_estimate.sender_pose_id);
          gtsam::Vector pose_data_vector(6);
          pose_data_vector << pose_estimate.pose_data[0], pose_estimate.pose_data[1], pose_estimate.pose_data[2], 
@@ -1004,16 +1111,58 @@ void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
 /****************************************/
 /****************************************/
 
+void CBuzzControllerQuadMapper::NeighborRotationEstimationIsFinished(const int& rid) {
+   neighbors_rotation_estimation_phase_is_finished_.at(rid) = true;
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::NeighborPoseEstimationIsFinished(const int& rid) {
+   neighbors_pose_estimation_phase_is_finished_.at(rid) = true;
+}
+
+/****************************************/
+/****************************************/
+
 bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    // Stopping condition
+   pose_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
    std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
-   if ( ( current_pose_iteration_ > optimization_phase_length_ && 
-         ( change < pose_estimate_change_threshold_ || known_other_robots_.size() == 0 ) ) || 
-        current_pose_iteration_ > maximum_number_of_optimization_iterations_ ) { // TODO : Add a control barrier to end optimization phase.
-      return true;
+   if(change < pose_estimate_change_threshold_ && current_pose_iteration_ != 0) {
+      pose_estimation_phase_is_finished_ = true;
    }
-   return false;
+   return pose_estimation_phase_is_finished_;
+}
+
+/****************************************/
+/****************************************/
+
+bool CBuzzControllerQuadMapper::PoseEstimationStoppingBarrier() {
+   bool stop_pose_estimation = pose_estimation_phase_is_finished_;
+   for (const auto& is_finished : neighbors_pose_estimation_phase_is_finished_) {
+      stop_pose_estimation &= is_finished.second;
+   }   
+   return stop_pose_estimation;
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::SetRotationEstimationIsFinishedFlagsToFalse() {
+   for (auto& is_finished : neighbors_rotation_estimation_phase_is_finished_) {
+      is_finished.second = false;
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::SetPoseEstimationIsFinishedFlagsToFalse() {
+   for (auto& is_finished : neighbors_pose_estimation_phase_is_finished_) {
+      is_finished.second = false;
+   }
 }
 
 /****************************************/
@@ -1029,7 +1178,7 @@ void CBuzzControllerQuadMapper::EndOptimization() {
 double CBuzzControllerQuadMapper::EvaluateCurrentEstimate() {
    gtsam::NonlinearFactorGraph chordal_graph = distributed_mapper::evaluation_utils::convertToChordalGraph(
         *local_pose_graph_, chordal_graph_noise_model_, false);
-   double distributed_error = 0; //chordal_graph.error(optimizer_->currentEstimate());
+   double distributed_error = 0; // chordal_graph.error(optimizer_->currentEstimate());
    //std::cout << "Robot " << robot_id_ << ", Distributed Error: " << distributed_error << std::endl;
    return distributed_error;
 }
@@ -1098,6 +1247,22 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "estimate_pose_and_update_pose", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzEstimatePoseAndUpdatePose));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "rotation_estimation_stopping_conditions", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzRotationEstimationStoppingConditions));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "pose_estimation_stopping_conditions", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzPoseEstimationStoppingConditions));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "neighbor_rotation_estimation_is_finished", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzNeighborRotationEstimationIsFinished));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "neighbor_pose_estimation_is_finished", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzNeighborPoseEstimationIsFinished));
    buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;

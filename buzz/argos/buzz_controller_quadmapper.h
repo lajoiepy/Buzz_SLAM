@@ -92,6 +92,14 @@ public:
 
    void EstimatePoseAndUpdatePose();
 
+   bool RotationEstimationStoppingConditions();
+
+   bool PoseEstimationStoppingConditions();
+
+   void NeighborRotationEstimationIsFinished(const int& rid);
+
+   void NeighborPoseEstimationIsFinished(const int& rid);
+
 protected:
 
    // Functions for link with buzz VM
@@ -125,19 +133,23 @@ protected:
 
    std::vector<size_t> FlaggedInitializationOrdering();
 
-   bool RotationEstimationStoppingConditions();
-
    void UpdateLocalEstimates();
 
    void AddNewKnownRobot(const unsigned char& other_robot_char);
 
    void InitializePoseEstimation();
 
-   bool PoseEstimationStoppingConditions();
-
    void EndOptimization();
 
    double EvaluateCurrentEstimate();
+
+   bool RotationEstimationStoppingBarrier();
+
+   bool PoseEstimationStoppingBarrier();
+
+   void SetRotationEstimationIsFinishedFlagsToFalse();
+
+   void SetPoseEstimationIsFinishedFlagsToFalse();
 
 protected:
    // General attributes of the controller
@@ -174,16 +186,16 @@ protected:
 
    int optimizer_period_;
 
+   bool rotation_estimation_phase_is_finished_, pose_estimation_phase_is_finished_;
+
+   std::map<int, bool> neighbors_rotation_estimation_phase_is_finished_, neighbors_pose_estimation_phase_is_finished_;
+
    // Constants that should be parameters in the future
    double rotation_noise_std_, translation_noise_std_;
 
    gtsam::SharedNoiseModel noise_model_;
 
    gtsam::noiseModel::Isotropic::shared_ptr chordal_graph_noise_model_;
-
-   int maximum_number_of_optimization_iterations_;
-
-   int optimization_phase_length_;
 
    double rotation_estimate_change_threshold_, pose_estimate_change_threshold_;
 
