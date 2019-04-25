@@ -735,7 +735,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          break;
       case End :
          EndOptimization();
-         EvaluateCurrentEstimate();
+         GetLatestLocalError();
          optimizer_state_ = OptimizerState::Idle;
          break;
    }
@@ -1170,24 +1170,18 @@ void CBuzzControllerQuadMapper::SetPoseEstimationIsFinishedFlagsToFalse() {
 
 void CBuzzControllerQuadMapper::EndOptimization() {
    optimizer_->retractPose3Global();
+   poses_initial_guess_->update(optimizer_->currentEstimate());
 }
 
 /****************************************/
 /****************************************/
 
-double CBuzzControllerQuadMapper::EvaluateCurrentEstimate() {
+double CBuzzControllerQuadMapper::GetLatestLocalError() {
    // We need the aggregate values for the total error, but we can get the local one.
    std::pair<double, double> errors = optimizer_->latestError();
    // Returns pose error
    std::cout << "[optimize pose] Final Error (Robot " << robot_id_ << "): " << errors.second << std::endl;
    return errors.second;
-}
-
-/****************************************/
-/****************************************/
-
-void CBuzzControllerQuadMapper::UpdateLocalEstimates() {
-
 }
 
 /****************************************/

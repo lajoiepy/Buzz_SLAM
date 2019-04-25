@@ -133,15 +133,13 @@ protected:
 
    std::vector<size_t> FlaggedInitializationOrdering();
 
-   void UpdateLocalEstimates();
-
    void AddNewKnownRobot(const unsigned char& other_robot_char);
 
    void InitializePoseEstimation();
 
    void EndOptimization();
 
-   double EvaluateCurrentEstimate();
+   double GetLatestLocalError();
 
    bool RotationEstimationStoppingBarrier();
 
@@ -189,6 +187,8 @@ protected:
    bool rotation_estimation_phase_is_finished_, pose_estimation_phase_is_finished_;
 
    std::map<int, bool> neighbors_rotation_estimation_phase_is_finished_, neighbors_pose_estimation_phase_is_finished_;
+
+   boost::shared_ptr<gtsam::Values> latest_pose_estimates_;
 
    // Constants that should be parameters in the future
    double rotation_noise_std_, translation_noise_std_;
