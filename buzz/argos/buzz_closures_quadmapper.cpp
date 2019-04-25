@@ -48,6 +48,19 @@ static int BuzzOptimizerState(buzzvm_t vm){
 /****************************************/
 /****************************************/
 
+static int BuzzIsAllowedToEstimate(buzzvm_t vm){
+
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   bool is_allowed_to_estimate = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->IsAllowedToEstimate();
+   buzzvm_pushi(vm, is_allowed_to_estimate);
+
+   return buzzvm_ret1(vm);
+}
+
+/****************************************/
+/****************************************/
+
 static int BuzzAddNeighborWithinCommunicationRange(buzzvm_t vm){
 
    buzzvm_lload(vm, 1);
@@ -664,6 +677,10 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "neighbor_pose_estimation_is_finished", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzNeighborPoseEstimationIsFinished));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "is_allowed_to_estimate", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzIsAllowedToEstimate));
    buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;

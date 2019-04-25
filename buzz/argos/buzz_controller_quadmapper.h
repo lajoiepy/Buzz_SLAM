@@ -100,6 +100,8 @@ public:
 
    void NeighborPoseEstimationIsFinished(const int& rid);
 
+   bool IsAllowedToEstimate();
+
 protected:
 
    // Functions for link with buzz VM
@@ -129,10 +131,6 @@ protected:
 
    void OutliersFiltering();
 
-   std::vector<size_t> TrivialOrdering();
-
-   std::vector<size_t> FlaggedInitializationOrdering();
-
    void AddNewKnownRobot(const unsigned char& other_robot_char);
 
    void InitializePoseEstimation();
@@ -148,6 +146,8 @@ protected:
    void SetRotationEstimationIsFinishedFlagsToFalse();
 
    void SetPoseEstimationIsFinishedFlagsToFalse();
+
+   bool AllRobotsAreInitialized();
 
 protected:
    // General attributes of the controller
@@ -198,6 +198,8 @@ protected:
    gtsam::noiseModel::Isotropic::shared_ptr chordal_graph_noise_model_;
 
    double rotation_estimate_change_threshold_, pose_estimate_change_threshold_;
+
+   bool use_flagged_initialization_;
 
 };
 }

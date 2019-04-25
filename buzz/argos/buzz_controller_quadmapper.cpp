@@ -27,6 +27,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    translation_noise_std_ = 0.1;
    rotation_estimate_change_threshold_ = 1e-1;
    pose_estimate_change_threshold_ = 1e-1;
+   use_flagged_initialization_ = false;
 
    // Initialize attributes
    number_of_poses_ = 0;
@@ -155,6 +156,33 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
 /****************************************/
 /****************************************/
 
+bool CBuzzControllerQuadMapper::IsAllowedToEstimate() {
+   if (!use_flagged_initialization_) {
+      return true;
+   }
+   bool is_allowed_to_estimate = true;
+   for (const auto& neighbor_init : optimizer_->getNeighboringRobotsInit()) {
+      if (!neighbor_init.second && ((((int) neighbor_init.first) - 97) < robot_id_)) {
+         is_allowed_to_estimate = false;
+      }
+   }
+   return is_allowed_to_estimate;
+}
+
+/****************************************/
+/****************************************/
+
+bool CBuzzControllerQuadMapper::AllRobotsAreInitialized() {
+   bool all_robots_initialized = optimizer_->isRobotInitialized();
+   for (const auto& is_robot_initialized : optimizer_->getNeighboringRobotsInit()) {
+      all_robots_initialized &= is_robot_initialized.second;
+   }
+   return all_robots_initialized;
+}
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
                                  const int& robot_2_id,
                                  const int& robot_1_pose_id,
@@ -238,7 +266,7 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
 
    disconnected_graph_ = true;
 
-   optimizer_->setFlaggedInit(false); // TODO: implement flagged initialization
+   optimizer_->setFlaggedInit(use_flagged_initialization_);
    
    optimizer_->setUpdateType(distributed_mapper::DistributedMapper::incUpdate);
    
@@ -261,9 +289,6 @@ void CBuzzControllerQuadMapper::StartPoseGraphOptimization() {
    UpdateOptimizer();
 
    OutliersFiltering();
-
-   // TODO: Add flagged initialization
-   // std::vector<size_t> ordering = TrivialOrdering();
 
    optimizer_->updateInitialized(false);
    optimizer_->clearNeighboringRobotInit();
@@ -289,27 +314,6 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
    if (neighboring_robots.size() > 0) {
       disconnected_graph_ = false;
    }
-}
-
-/****************************************/
-/****************************************/
-
-std::vector<size_t> CBuzzControllerQuadMapper::TrivialOrdering() {
-   std::vector<size_t> ordering;
-   for(const gtsam::Values::ConstKeyValuePair& key_value: optimizer_->neighbors()){
-      char symbol = gtsam::symbolChr(key_value.key);
-      ordering.emplace_back(((int) symbol) - 97);
-   }
-   return ordering;
-}
-
-/****************************************/
-/****************************************/
-
-std::vector<size_t> CBuzzControllerQuadMapper::FlaggedInitializationOrdering() {
-   std::vector<size_t> ordering;
-   // TODO
-   return ordering;
 }
 
 /****************************************/
@@ -409,7 +413,7 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    rotation_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
    std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
-   if(change < rotation_estimate_change_threshold_ && current_rotation_iteration_ != 0) {
+   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_ && current_rotation_iteration_ != 0) {
       rotation_estimation_phase_is_finished_ = true;
    }
    return rotation_estimation_phase_is_finished_;
@@ -541,7 +545,7 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    pose_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
    std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
-   if(change < pose_estimate_change_threshold_ && current_pose_iteration_ != 0) {
+   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < pose_estimate_change_threshold_ && current_pose_iteration_ != 0) {
       pose_estimation_phase_is_finished_ = true;
    }
    return pose_estimation_phase_is_finished_;
