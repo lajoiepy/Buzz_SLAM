@@ -1176,11 +1176,11 @@ void CBuzzControllerQuadMapper::EndOptimization() {
 /****************************************/
 
 double CBuzzControllerQuadMapper::EvaluateCurrentEstimate() {
-   gtsam::NonlinearFactorGraph chordal_graph = distributed_mapper::evaluation_utils::convertToChordalGraph(
-        *local_pose_graph_, chordal_graph_noise_model_, false);
-   double distributed_error = 0; // chordal_graph.error(optimizer_->currentEstimate());
-   //std::cout << "Robot " << robot_id_ << ", Distributed Error: " << distributed_error << std::endl;
-   return distributed_error;
+   // We need the aggregate values for the total error, but we can get the local one.
+   std::pair<double, double> errors = optimizer_->latestError();
+   // Returns pose error
+   std::cout << "[optimize pose] Final Error (Robot " << robot_id_ << "): " << errors.second << std::endl;
+   return errors.second;
 }
 
 /****************************************/
