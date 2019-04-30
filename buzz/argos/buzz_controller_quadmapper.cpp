@@ -27,7 +27,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    translation_noise_std_ = 0.1;
    rotation_estimate_change_threshold_ = 1e-1;
    pose_estimate_change_threshold_ = 1e-1;
-   use_flagged_initialization_ = false;
+   use_flagged_initialization_ = true;
 
    // Initialize attributes
    number_of_poses_ = 0;
@@ -339,6 +339,17 @@ void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& r
 
 void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
 
+   // Mark the robot with the lowest id as initialized
+   if (use_flagged_initialization_ && !optimizer_->isRobotInitialized()) {
+      bool is_initialized = true;
+      for (const auto& neighbor : neighbors_within_communication_range_) {
+         if (neighbor < robot_id_) {
+            is_initialized = false;
+         }
+      }
+      optimizer_->updateInitialized(is_initialized);
+   }
+
    // Create empty data table
    buzzobj_t b_rotation_estimates = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
 
@@ -400,9 +411,11 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
 /****************************************/
 
 void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
-   optimizer_->estimateRotation();
-   optimizer_->updateRotation();
-   optimizer_->updateInitialized(true);
+   if (optimizer_state_ == OptimizerState::RotationEstimation) {
+      optimizer_->estimateRotation();
+      optimizer_->updateRotation();
+      optimizer_->updateInitialized(true);
+   }
 }
 
 /****************************************/
@@ -412,7 +425,7 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    // Stopping condition
    rotation_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
-   std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
+   if (robot_id_ == 0) std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_ && current_rotation_iteration_ != 0) {
       rotation_estimation_phase_is_finished_ = true;
    }
@@ -457,6 +470,17 @@ void CBuzzControllerQuadMapper::InitializePoseEstimation() {
 /****************************************/
 
 void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& rid) {
+
+   // Mark the robot with the lowest id as initialized
+   if (use_flagged_initialization_ && !optimizer_->isRobotInitialized()) {
+      bool is_initialized = true;
+      for (const auto& neighbor : neighbors_within_communication_range_) {
+         if (neighbor < robot_id_) {
+            is_initialized = false;
+         }
+      }
+      optimizer_->updateInitialized(is_initialized);
+   }
 
    // Create empty data table
    buzzobj_t b_pose_estimates = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
@@ -506,6 +530,8 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
       for (const auto& pose_estimate : pose_estimates_from_one_robot) {
          gtsam::Symbol symbol((unsigned char)(pose_estimate.sender_robot_id+97), pose_estimate.sender_pose_id);
          gtsam::Vector pose_data_vector(6);
+         //std::cout << "Robot " << pose_estimate.sender_robot_id << " at " << symbol.key() << ". Est[0]=" << pose_estimate.pose_data[0] << std::endl;
+         //std::cout << "Robot " << pose_estimate.sender_robot_id << " is init? " << pose_estimate.sender_robot_is_initialized << std::endl;
          pose_data_vector << pose_estimate.pose_data[0], pose_estimate.pose_data[1], pose_estimate.pose_data[2], 
                                  pose_estimate.pose_data[3], pose_estimate.pose_data[4], pose_estimate.pose_data[5];
          optimizer_->updateNeighborLinearizedPoses(symbol.key(), pose_data_vector);
@@ -544,7 +570,7 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    // Stopping condition
    pose_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
-   std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
+   if (robot_id_ == 0) std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < pose_estimate_change_threshold_ && current_pose_iteration_ != 0) {
       pose_estimation_phase_is_finished_ = true;
    }
