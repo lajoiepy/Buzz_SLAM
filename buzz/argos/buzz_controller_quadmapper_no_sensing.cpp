@@ -75,7 +75,7 @@ int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& 
       ComputeNoisyFakeOdometryMeasurement();
 
       // Log data
-      WriteDataset(this->GetBuzzVM()->robot);   
+      WriteDataset();   
    }
 
    return number_of_poses_;

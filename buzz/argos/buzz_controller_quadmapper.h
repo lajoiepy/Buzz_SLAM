@@ -120,7 +120,9 @@ protected:
    virtual buzzvm_state RegisterFunctions();
 
    // Utility functions
-   void WriteDataset(const uint16_t& robot_id);
+   void WriteDataset();
+
+   void WriteOptimizedDataset();
 
    // Wrapper function related to distributed_mapper
    void IncrementNumberOfPosesAndUpdateState();
@@ -148,6 +150,8 @@ protected:
    void SetPoseEstimationIsFinishedFlagsToFalse();
 
    bool AllRobotsAreInitialized();
+
+   bool CompareCentralizedAndDecentralizedError();
 
 protected:
    // General attributes of the controller
@@ -188,7 +192,7 @@ protected:
 
    std::map<int, bool> neighbors_rotation_estimation_phase_is_finished_, neighbors_pose_estimation_phase_is_finished_;
 
-   boost::shared_ptr<gtsam::Values> latest_pose_estimates_;
+   gtsam::NonlinearFactorGraph local_pose_graph_before_optimization_;
 
    // Constants that should be parameters in the future
    double rotation_noise_std_, translation_noise_std_;
@@ -200,6 +204,13 @@ protected:
    double rotation_estimate_change_threshold_, pose_estimate_change_threshold_;
 
    bool use_flagged_initialization_;
+
+   // Parameter for evaluation
+   int number_of_robots_;
+
+   bool is_simulation_;
+
+   std::string error_file_name_;
 
 };
 }
