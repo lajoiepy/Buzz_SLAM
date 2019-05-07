@@ -43,6 +43,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    poses_initial_guess_->insert(previous_symbol_.key(), previous_pose_);
    current_rotation_iteration_ = 0;
    current_pose_iteration_ = 0;
+   is_estimation_done_ = false;
 
    // Isotropic noise models
    Eigen::VectorXd sigmas(6);
@@ -135,6 +136,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             neighbors_within_communication_range_.clear();
             neighbors_rotation_estimation_phase_is_finished_.clear();
             neighbors_pose_estimation_phase_is_finished_.clear();
+            neighbors_is_estimation_done_.clear();
          }
          break;
       case Start :
@@ -145,12 +147,16 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          current_rotation_iteration_++;
          if (RotationEstimationStoppingBarrier()) {
             // Change optimizer state
-            optimizer_state_ = OptimizerState::PoseEstimation;
-            InitializePoseEstimation();
+            optimizer_state_ = OptimizerState::PoseEstimationInitialization;
          } else {
             // Reinitialize neighbors states information
             SetRotationEstimationIsFinishedFlagsToFalse();
          }
+         break;
+      case PoseEstimationInitialization :
+         InitializePoseEstimation();
+         // Change optimizer state
+         optimizer_state_ = OptimizerState::PoseEstimation;
          break;
       case PoseEstimation :
          current_pose_iteration_++;
@@ -166,7 +172,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          EndOptimization();
          GetLatestLocalError();
          optimizer_state_ = OptimizerState::Idle;
-         if (is_simulation_ && robot_id_ == 0) {
+         if (is_simulation_ && robot_id_ == number_of_robots_-1) {
             CompareCentralizedAndDecentralizedError();
          }
          break;
@@ -176,17 +182,35 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
 /****************************************/
 /****************************************/
 
-bool CBuzzControllerQuadMapper::IsAllowedToEstimate() {
-   if (!use_flagged_initialization_) {
-      return true;
-   }
-   bool is_allowed_to_estimate = true;
-   for (const auto& neighbor_init : optimizer_->getNeighboringRobotsInit()) {
-      if (!neighbor_init.second && ((((int) neighbor_init.first) - 97) < robot_id_)) {
-         is_allowed_to_estimate = false;
+OptimizerPhase CBuzzControllerQuadMapper::GetOptimizerPhase() {
+   // Self done + others done, reset
+   if (is_estimation_done_) {
+      bool all_done = true;
+      for (const auto& neighbor_done : neighbors_is_estimation_done_) {
+         all_done &= neighbor_done.second;
+      }
+      if (all_done) {
+         for (auto& neighbor_done : neighbors_is_estimation_done_) {
+            neighbor_done.second = false;
+         }
+         is_estimation_done_ = false;
       }
    }
-   return is_allowed_to_estimate;
+   if (is_estimation_done_) {
+      return OptimizerPhase::Communication;
+   }
+   // Smallest ID not done -> estimation
+   bool smallest_id_not_done = true;
+   for (const auto& neighbor_done : neighbors_is_estimation_done_) {
+      if (!neighbor_done.second && neighbor_done.first < robot_id_) {
+         smallest_id_not_done = false;
+      }
+   }
+   auto phase = OptimizerPhase::Communication;
+   if (smallest_id_not_done && !neighbors_is_estimation_done_.empty()) {
+      phase = OptimizerPhase::Estimation;
+   }
+   return phase;
 }
 
 /****************************************/
@@ -241,7 +265,7 @@ void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::WriteDataset() {
+void CBuzzControllerQuadMapper::WriteCurrentDataset() {
    std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + ".g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
 }
@@ -253,6 +277,15 @@ void CBuzzControllerQuadMapper::WriteOptimizedDataset() {
    std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
 }
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::WriteInitialDataset() {
+   std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
+   gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
+}
+
 
 /****************************************/
 /****************************************/
@@ -307,6 +340,8 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
    rotation_estimation_phase_is_finished_ = false;
 
    pose_estimation_phase_is_finished_ = false;
+
+   is_estimation_done_ = false;
 }
 
 /****************************************/
@@ -345,6 +380,7 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
 
    // Save state before optimization
    local_pose_graph_before_optimization_ = *local_pose_graph_;
+   WriteInitialDataset();
 }
 
 /****************************************/
@@ -363,6 +399,7 @@ void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& r
    neighbors_within_communication_range_.emplace_back(rid);
    neighbors_rotation_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
    neighbors_pose_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
+   neighbors_is_estimation_done_.insert(std::make_pair(rid, false));
 }
 
 /****************************************/
@@ -401,6 +438,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
          int robot_pose_id = separator_symbols.second.index();
          TablePut(b_individual_estimate, "sender_pose_id", robot_pose_id);
          TablePut(b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
+         TablePut(b_individual_estimate, "sender_estimation_is_done", (int) is_estimation_done_);
 
          gtsam::Vector rotation_estimate = optimizer_->linearizedRotationAt(separator_symbols.second.key());
          buzzobj_t b_individual_estimate_rotation = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
@@ -434,6 +472,7 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
                                  rotation_estimate.rotation_matrix[6], rotation_estimate.rotation_matrix[7], rotation_estimate.rotation_matrix[8];
          optimizer_->updateNeighborLinearizedRotations(symbol.key(), rotation_matrix_vector);
          optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
+         neighbors_is_estimation_done_[rotation_estimate.sender_robot_id] = rotation_estimate.sender_estimation_is_done;
       }
    }
 }
@@ -446,6 +485,7 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
       optimizer_->estimateRotation();
       optimizer_->updateRotation();
       optimizer_->updateInitialized(true);
+      is_estimation_done_ = true;
    }
 }
 
@@ -456,7 +496,7 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    // Stopping condition
    rotation_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
-   if (robot_id_ == 0) std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
+   std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_ && current_rotation_iteration_ != 0) {
       rotation_estimation_phase_is_finished_ = true;
    }
@@ -495,6 +535,10 @@ void CBuzzControllerQuadMapper::InitializePoseEstimation() {
    // Reset flags for flagged initialization.
    optimizer_->updateInitialized(false);
    optimizer_->clearNeighboringRobotInit();
+   is_estimation_done_ = false;
+   for (auto& neighbor_done : neighbors_is_estimation_done_) {
+      neighbor_done.second = false;
+   }
 }
 
 /****************************************/
@@ -533,6 +577,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
          int robot_pose_id = separator_symbols.second.index();
          TablePut(b_individual_estimate, "sender_pose_id", robot_pose_id);
          TablePut(b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
+         TablePut(b_individual_estimate, "sender_estimation_is_done", (int) is_estimation_done_);
 
          gtsam::Vector pose_estimate = optimizer_->linearizedPosesAt(separator_symbols.second.key());
          buzzobj_t b_individual_estimate_pose = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
@@ -545,6 +590,12 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
 
          TablePut(b_pose_estimates, table_size, b_individual_estimate);
          table_size++;
+
+         gtsam::Symbol debug_symbol(robot_id_char_, robot_pose_id);
+         /*std::cout << std::endl;
+         std::cout << "Sent Robot " << robot_id_ << " at " << debug_symbol.key() << ". Est[0]=" << pose_estimate[0] << std::endl;
+         std::cout << "Sent Robot " << robot_id_ << " is init? " << optimizer_is_initialized << std::endl;
+         std::cout << std::endl;*/
       }
 
    }
@@ -561,12 +612,15 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
       for (const auto& pose_estimate : pose_estimates_from_one_robot) {
          gtsam::Symbol symbol((unsigned char)(pose_estimate.sender_robot_id+97), pose_estimate.sender_pose_id);
          gtsam::Vector pose_data_vector(6);
-         //std::cout << "Robot " << pose_estimate.sender_robot_id << " at " << symbol.key() << ". Est[0]=" << pose_estimate.pose_data[0] << std::endl;
-         //std::cout << "Robot " << pose_estimate.sender_robot_id << " is init? " << pose_estimate.sender_robot_is_initialized << std::endl;
+         /*std::cout << std::endl;
+         std::cout << "Received Robot " << pose_estimate.sender_robot_id << " at " << symbol.key() << ". Est[0]=" << pose_estimate.pose_data[0] << std::endl;
+         std::cout << "Received Robot " << pose_estimate.sender_robot_id << " is init? " << pose_estimate.sender_robot_is_initialized << std::endl;
+         std::cout << std::endl;*/
          pose_data_vector << pose_estimate.pose_data[0], pose_estimate.pose_data[1], pose_estimate.pose_data[2], 
                                  pose_estimate.pose_data[3], pose_estimate.pose_data[4], pose_estimate.pose_data[5];
          optimizer_->updateNeighborLinearizedPoses(symbol.key(), pose_data_vector);
          optimizer_->updateNeighboringRobotInitialized(symbol.chr(), pose_estimate.sender_robot_is_initialized); // Used only with flagged initialization
+         neighbors_is_estimation_done_[pose_estimate.sender_robot_id] = pose_estimate.sender_estimation_is_done;
       }
    }
 }
@@ -575,9 +629,13 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
 /****************************************/
 
 void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
+   std::cout << std::endl;
+   std::cout << "Robot " << robot_id_ << " : Estimating Poses" << std::endl;
+   std::cout << std::endl;
    optimizer_->estimatePoses();
    optimizer_->updatePoses();
    optimizer_->updateInitialized(true);
+   is_estimation_done_ = true;
 }
 
 /****************************************/
@@ -601,7 +659,7 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    // Stopping condition
    pose_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
-   if (robot_id_ == 0) std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
+   std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < pose_estimate_change_threshold_ && current_pose_iteration_ != 0) {
       pose_estimation_phase_is_finished_ = true;
    }
@@ -642,6 +700,7 @@ void CBuzzControllerQuadMapper::SetPoseEstimationIsFinishedFlagsToFalse() {
 
 void CBuzzControllerQuadMapper::EndOptimization() {
    optimizer_->retractPose3Global();
+   // TODO: Update
    // No update because we would need to recompute the initial guess from the subsequent poses.
    //poses_initial_guess_->update(optimizer_->currentEstimate());
    WriteOptimizedDataset();
@@ -669,13 +728,15 @@ bool CBuzzControllerQuadMapper::CompareCentralizedAndDecentralizedError() {
    for (size_t i = 0; i < number_of_robots_; i++) {
       std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_optimized.g2o";
       gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
-      graph_and_values_vec.push_back(graph_and_values);
       for (const gtsam::Values::ConstKeyValuePair &key_value: *graph_and_values.second) {
          gtsam::Key key = key_value.key;
          if (!distributed.exists(key)) {
             distributed.insert(key, (*graph_and_values.second).at<gtsam::Pose3>(key));
          }
       }
+      dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial.g2o";
+      graph_and_values = gtsam::readG2o(dataset_file_name, true);
+      graph_and_values_vec.push_back(graph_and_values);
    }
    gtsam::GraphAndValues full_graph_and_values = distributed_mapper::evaluation_utils::readFullGraph(number_of_robots_, graph_and_values_vec);
 

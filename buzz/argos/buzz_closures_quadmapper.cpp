@@ -48,12 +48,12 @@ static int BuzzOptimizerState(buzzvm_t vm){
 /****************************************/
 /****************************************/
 
-static int BuzzIsAllowedToEstimate(buzzvm_t vm){
+static int BuzzOptimizerPhase(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   bool is_allowed_to_estimate = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->IsAllowedToEstimate();
-   buzzvm_pushi(vm, is_allowed_to_estimate);
+   int phase = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->GetOptimizerPhase();
+   buzzvm_pushi(vm, phase);
 
    return buzzvm_ret1(vm);
 }
@@ -168,6 +168,13 @@ static int BuzzUpdateNeighborRotationEstimates(buzzvm_t vm){
          buzzobj_t b_sender_robot_is_initialized = buzzvm_stack_at(vm, 1);
          buzzvm_pop(vm);
          rotation_estimate.sender_robot_is_initialized = (bool)b_sender_robot_is_initialized->i.value;
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_estimation_is_done", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_sender_estimation_is_done = buzzvm_stack_at(vm, 1);
+         buzzvm_pop(vm);
+         rotation_estimate.sender_estimation_is_done = (bool)b_sender_estimation_is_done->i.value;
 
          buzzvm_dup(vm);
          buzzvm_pushs(vm, buzzvm_string_register(vm, "rotation_estimate", 1));
@@ -286,6 +293,13 @@ static int BuzzUpdateNeighborPoseEstimates(buzzvm_t vm){
          buzzobj_t b_sender_robot_is_initialized = buzzvm_stack_at(vm, 1);
          buzzvm_pop(vm);
          pose_estimate.sender_robot_is_initialized = (bool)b_sender_robot_is_initialized->i.value;
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_estimation_is_done", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_sender_estimation_is_done = buzzvm_stack_at(vm, 1);
+         buzzvm_pop(vm);
+         pose_estimate.sender_estimation_is_done = (bool)b_sender_estimation_is_done->i.value;
 
          buzzvm_dup(vm);
          buzzvm_pushs(vm, buzzvm_string_register(vm, "pose_estimate", 1));
@@ -679,8 +693,8 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzNeighborPoseEstimationIsFinished));
    buzzvm_gstore(m_tBuzzVM);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "is_allowed_to_estimate", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzIsAllowedToEstimate));
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "optimizer_phase", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzOptimizerPhase));
    buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;

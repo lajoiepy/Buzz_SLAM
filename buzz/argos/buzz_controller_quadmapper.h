@@ -21,7 +21,12 @@ namespace buzz_quadmapper {
 /*
 *  Enum of all the possible state of the optimizer
 */
-enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimation, End };
+enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimationInitialization, PoseEstimation, End };
+
+/*
+*  Enum of the phases during the distributed optimization
+*/
+enum OptimizerPhase { Communication, Estimation };
 
 /*
 *  Rotation estimate message
@@ -30,6 +35,7 @@ typedef struct {
    int sender_robot_id;
    int sender_pose_id;
    bool sender_robot_is_initialized;
+   bool sender_estimation_is_done;
    double rotation_matrix[9];
 } rotation_estimate_t;
 
@@ -40,6 +46,7 @@ typedef struct {
    int sender_robot_id;
    int sender_pose_id;
    bool sender_robot_is_initialized;
+   bool sender_estimation_is_done;
    double pose_data[6];
 } pose_estimate_t;
 
@@ -100,7 +107,7 @@ public:
 
    void NeighborPoseEstimationIsFinished(const int& rid);
 
-   bool IsAllowedToEstimate();
+   OptimizerPhase GetOptimizerPhase();
 
 protected:
 
@@ -120,7 +127,9 @@ protected:
    virtual buzzvm_state RegisterFunctions();
 
    // Utility functions
-   void WriteDataset();
+   void WriteCurrentDataset();
+
+   void WriteInitialDataset();
 
    void WriteOptimizedDataset();
 
@@ -152,6 +161,8 @@ protected:
    bool AllRobotsAreInitialized();
 
    bool CompareCentralizedAndDecentralizedError();
+
+   void UpdateOptimizerPhase();
 
 protected:
    // General attributes of the controller
@@ -190,7 +201,9 @@ protected:
 
    bool rotation_estimation_phase_is_finished_, pose_estimation_phase_is_finished_;
 
-   std::map<int, bool> neighbors_rotation_estimation_phase_is_finished_, neighbors_pose_estimation_phase_is_finished_;
+   std::map<int, bool> neighbors_rotation_estimation_phase_is_finished_, neighbors_pose_estimation_phase_is_finished_, neighbors_is_estimation_done_;
+
+   bool is_estimation_done_;
 
    gtsam::NonlinearFactorGraph local_pose_graph_before_optimization_;
 
