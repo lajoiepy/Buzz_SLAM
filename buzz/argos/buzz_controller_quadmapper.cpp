@@ -140,6 +140,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          }
          break;
       case Start :
+         std::cout << "Robot " << robot_id_ << "Start Distributed Pose Graph Optimization" << std::endl;
          StartPoseGraphOptimization();
          optimizer_state_ = OptimizerState::RotationEstimation;
          break;
@@ -175,6 +176,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          if (is_simulation_ && robot_id_ == number_of_robots_-1) {
             CompareCentralizedAndDecentralizedError();
          }
+         std::cout << "Robot " << robot_id_ << "End Distributed Pose Graph Optimization" << std::endl;
          break;
    }
 }
@@ -496,7 +498,7 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    // Stopping condition
    rotation_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
-   std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
+   //std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl; // TODO : Add debug prints option
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_ && current_rotation_iteration_ != 0) {
       rotation_estimation_phase_is_finished_ = true;
    }
@@ -592,10 +594,6 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
          table_size++;
 
          gtsam::Symbol debug_symbol(robot_id_char_, robot_pose_id);
-         /*std::cout << std::endl;
-         std::cout << "Sent Robot " << robot_id_ << " at " << debug_symbol.key() << ". Est[0]=" << pose_estimate[0] << std::endl;
-         std::cout << "Sent Robot " << robot_id_ << " is init? " << optimizer_is_initialized << std::endl;
-         std::cout << std::endl;*/
       }
 
    }
@@ -612,10 +610,6 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
       for (const auto& pose_estimate : pose_estimates_from_one_robot) {
          gtsam::Symbol symbol((unsigned char)(pose_estimate.sender_robot_id+97), pose_estimate.sender_pose_id);
          gtsam::Vector pose_data_vector(6);
-         /*std::cout << std::endl;
-         std::cout << "Received Robot " << pose_estimate.sender_robot_id << " at " << symbol.key() << ". Est[0]=" << pose_estimate.pose_data[0] << std::endl;
-         std::cout << "Received Robot " << pose_estimate.sender_robot_id << " is init? " << pose_estimate.sender_robot_is_initialized << std::endl;
-         std::cout << std::endl;*/
          pose_data_vector << pose_estimate.pose_data[0], pose_estimate.pose_data[1], pose_estimate.pose_data[2], 
                                  pose_estimate.pose_data[3], pose_estimate.pose_data[4], pose_estimate.pose_data[5];
          optimizer_->updateNeighborLinearizedPoses(symbol.key(), pose_data_vector);
@@ -629,9 +623,6 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
 /****************************************/
 
 void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
-   std::cout << std::endl;
-   std::cout << "Robot " << robot_id_ << " : Estimating Poses" << std::endl;
-   std::cout << std::endl;
    optimizer_->estimatePoses();
    optimizer_->updatePoses();
    optimizer_->updateInitialized(true);
@@ -659,7 +650,7 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    // Stopping condition
    pose_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
-   std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
+   // std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < pose_estimate_change_threshold_ && current_pose_iteration_ != 0) {
       pose_estimation_phase_is_finished_ = true;
    }
@@ -713,7 +704,6 @@ double CBuzzControllerQuadMapper::GetLatestLocalError() {
    // We need the aggregate values for the total error, but we can get the local one.
    std::pair<double, double> errors = optimizer_->latestError();
    // Returns pose error
-   std::cout << "[optimize pose] Final Error (Robot " << robot_id_ << "): " << errors.second << std::endl;
    return errors.second;
 }
 
