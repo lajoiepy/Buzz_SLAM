@@ -64,6 +64,11 @@ public:
 
    virtual void Init(TConfigurationNode& t_node);
 
+   void LoadParameters(const float& rotation_noise_std, const float& translation_noise_std,
+                     const float& rotation_estimate_change_threshold, const float& translation_estimate_change_threshold,
+                     const bool& use_flagged_initialization, const bool& is_simulation,
+                     const int& number_of_robots, const std::string& error_file_name);
+
    // Control functions
    void SetNextPosition(const CVector3& c_heading);
 

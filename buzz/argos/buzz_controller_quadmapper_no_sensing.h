@@ -29,6 +29,8 @@ public:
    int ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
                                           const int& pose_id, const int& robot_id, const int& this_robot_pose_id);
 
+   void LoadParameters(const double& sensor_range, const double& outlier_probability);
+
 private:
 
    // Fake measurements generation

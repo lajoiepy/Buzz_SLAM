@@ -24,9 +24,7 @@ CBuzzControllerQuadMapperNoSensing::~CBuzzControllerQuadMapperNoSensing() {
 void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    CBuzzControllerQuadMapper::Init(t_node);
 
-   // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
-   sensor_range_ = 15;
-   outlier_probability_ = 0.0; // TODO: Currently no outlier until I integrate the distributed pairwise consistency maximization.
+   // Initialize for tracing variables
    number_of_outliers_added_ = 0;
 
    // Initialize random numbers generators
@@ -44,6 +42,14 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
 
    // Save ground truth for fake separator creation
    SavePoseGroundTruth();
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapperNoSensing::LoadParameters(const double& sensor_range, const double& outlier_probability) {
+   sensor_range_ = sensor_range;
+   outlier_probability_ = outlier_probability;
 }
 
 /****************************************/

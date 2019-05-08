@@ -25,13 +25,6 @@ CBuzzControllerQuadMapper::~CBuzzControllerQuadMapper() {
 
 void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    CBuzzControllerSpiri::Init(t_node);
-   // Initialize constant attributes // TODO: add paramaters for them or get them by buzz
-   rotation_noise_std_ = 0.01;
-   translation_noise_std_ = 0.1;
-   rotation_estimate_change_threshold_ = 1e-1;
-   pose_estimate_change_threshold_ = 1e-1;
-   use_flagged_initialization_ = true;
-
    // Initialize attributes
    number_of_poses_ = 0;
    robot_id_ = this->GetBuzzVM()->robot;
@@ -52,11 +45,6 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    noise_model_ = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
    chordal_graph_noise_model_ = gtsam::noiseModel::Isotropic::Variance(12, 1);
 
-   // Evaluation parameters
-   number_of_robots_ = 2;
-   is_simulation_ = true;
-   error_file_name_ = "log/datasets/errors.csv";
-
    // Initialize log files
    if (is_simulation_ && robot_id_ ==  0 && !boost::filesystem::exists(error_file_name_)) {
       // Write results to csv
@@ -65,6 +53,24 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
       error_file << "NumberOfRobots\tNumberOfPoses\tErrorCentralized\tErrorDecentralized\tNumberOfRotationIterations\tNumberOfPoseIterations\n";
       error_file.close();
    }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::LoadParameters(const float& rotation_noise_std, const float& translation_noise_std,
+                                                const float& rotation_estimate_change_threshold, const float& translation_estimate_change_threshold,
+                                                const bool& use_flagged_initialization, const bool& is_simulation,
+                                                const int& number_of_robots, const std::string& error_file_name) {
+   rotation_noise_std_ = rotation_noise_std;
+   translation_noise_std_ = translation_noise_std;
+   rotation_estimate_change_threshold_ = rotation_estimate_change_threshold;
+   pose_estimate_change_threshold_ = translation_estimate_change_threshold;
+   use_flagged_initialization_ = use_flagged_initialization;
+
+   number_of_robots_ = number_of_robots;
+   is_simulation_ = is_simulation;
+   error_file_name_ = error_file_name;
 }
 
 /****************************************/
