@@ -21,7 +21,7 @@ namespace buzz_quadmapper {
 /*
 *  Enum of all the possible state of the optimizer
 */
-enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimationInitialization, PoseEstimation, End };
+enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimationInitialization, PoseEstimation, End, PostEndingCommunicationDelay };
 
 /*
 *  Enum of the phases during the distributed optimization
@@ -64,10 +64,11 @@ public:
 
    virtual void Init(TConfigurationNode& t_node);
 
-   void LoadParameters(const float& rotation_noise_std, const float& translation_noise_std,
-                     const float& rotation_estimate_change_threshold, const float& translation_estimate_change_threshold,
-                     const bool& use_flagged_initialization, const bool& is_simulation,
-                     const int& number_of_robots, const std::string& error_file_name);
+   void LoadParameters( const bool& debug,
+                        const float& rotation_noise_std, const float& translation_noise_std,
+                        const float& rotation_estimate_change_threshold, const float& translation_estimate_change_threshold,
+                        const bool& use_flagged_initialization, const bool& is_simulation,
+                        const int& number_of_robots, const std::string& error_file_name);
 
    // Control functions
    void SetNextPosition(const CVector3& c_heading);
@@ -113,6 +114,8 @@ public:
    void NeighborPoseEstimationIsFinished(const int& rid);
 
    OptimizerPhase GetOptimizerPhase();
+
+   void CheckIfAllEstimationDoneAndReset();
 
 protected:
 
@@ -220,6 +223,10 @@ protected:
    double rotation_estimate_change_threshold_, pose_estimate_change_threshold_;
 
    bool use_flagged_initialization_;
+
+   bool debug_;
+
+   int end_delay_;
 
    // Parameter for evaluation
    int number_of_robots_;

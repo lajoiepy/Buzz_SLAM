@@ -61,6 +61,16 @@ static int BuzzOptimizerPhase(buzzvm_t vm){
 /****************************************/
 /****************************************/
 
+static int BuzzCheckIfAllEstimationDoneAndReset(buzzvm_t vm) {
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->CheckIfAllEstimationDoneAndReset();
+}
+
+
+/****************************************/
+/****************************************/
+
 static int BuzzAddNeighborWithinCommunicationRange(buzzvm_t vm){
 
    buzzvm_lload(vm, 1);
@@ -544,7 +554,9 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 6);
    buzzvm_lload(vm, 7);
    buzzvm_lload(vm, 8);
+   buzzvm_lload(vm, 9);
    /* Retrieve parameters and check their types */
+   buzzobj_t b_debug = buzzvm_stack_at(vm, 9);
    buzzobj_t b_rotation_noise_std = buzzvm_stack_at(vm, 8);
    buzzobj_t b_translation_noise_std = buzzvm_stack_at(vm, 7);
    buzzobj_t b_rotation_estimate_change_threshold = buzzvm_stack_at(vm, 6);
@@ -555,7 +567,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzobj_t b_error_file_name = buzzvm_stack_at(vm, 1);
    float rotation_noise_std, translation_noise_std, 
       rotation_estimate_change_threshold, translation_estimate_change_threshold;
-   bool use_flagged_initialization, is_simulation;
+   bool use_flagged_initialization, is_simulation, debug;
    int number_of_robots;
    std::string error_file_name;
 
@@ -566,7 +578,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_use_flagged_initialization->o.type == BUZZTYPE_INT &&
       b_is_simulation->o.type == BUZZTYPE_INT &&
       b_number_of_robots->o.type == BUZZTYPE_INT &&
-      b_error_file_name->o.type == BUZZTYPE_STRING) {
+      b_error_file_name->o.type == BUZZTYPE_STRING &&
+      b_debug->o.type == BUZZTYPE_INT) {
 
       // Fill in variables
       rotation_noise_std = b_rotation_noise_std->f.value;
@@ -577,6 +590,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       is_simulation = (bool) b_is_simulation->i.value;
       number_of_robots = b_number_of_robots->i.value;
       error_file_name = b_error_file_name->s.value.str;
+      debug = b_debug->i.value;
 
    } else {
       buzzvm_seterror(vm,
@@ -589,7 +603,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(rotation_noise_std, translation_noise_std,
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(debug,
+                     rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, translation_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,
                      number_of_robots, error_file_name);
@@ -764,6 +779,10 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "optimizer_phase", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzOptimizerPhase));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "check_if_all_estimation_done_and_reset", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzCheckIfAllEstimationDoneAndReset));
    buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;
