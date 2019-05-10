@@ -129,14 +129,14 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement() {
 
    // Update attributes value
    previous_simulation_gt_pose_ = m_pcPos->GetReading();
-   previous_pose_ = previous_pose_ * measurement;
+   auto new_pose_ = poses_initial_guess_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
    previous_symbol_ = current_symbol_;
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(new_factor);
 
    // Add new pose estimate into initial guess
-   poses_initial_guess_->insert(previous_symbol_.key(), previous_pose_);
+   poses_initial_guess_->insert(current_symbol_.key(), new_pose_);
 
    // Save ground truth for fake separator creation
    SavePoseGroundTruth();

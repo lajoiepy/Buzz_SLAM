@@ -185,8 +185,6 @@ protected:
    // Current state of the controller
    gtsam::Symbol previous_symbol_;
 
-   gtsam::Pose3 previous_pose_;
-
    int number_of_poses_;
 
    std::set<unsigned char> known_other_robots_;

@@ -30,10 +30,9 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    robot_id_ = this->GetBuzzVM()->robot;
    robot_id_char_ = (unsigned char)(97 + robot_id_);
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
-   previous_pose_ = gtsam::Pose3();
    local_pose_graph_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
    poses_initial_guess_ = boost::make_shared< gtsam::Values >();
-   poses_initial_guess_->insert(previous_symbol_.key(), previous_pose_);
+   poses_initial_guess_->insert(previous_symbol_.key(), gtsam::Pose3());
    current_rotation_iteration_ = 0;
    current_pose_iteration_ = 0;
    is_estimation_done_ = false;
@@ -699,7 +698,23 @@ void CBuzzControllerQuadMapper::EndOptimization() {
    optimizer_->retractPose3Global();
    // TODO: Update
    // No update because we would need to recompute the initial guess from the subsequent poses.
-   //poses_initial_guess_->update(optimizer_->currentEstimate());
+   poses_initial_guess_->update(optimizer_->currentEstimate());
+
+   for (auto factor : *local_pose_graph_) {
+      auto between_factor = boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3> >(factor);
+      auto first_key = between_factor->key1();
+      auto second_key = between_factor->key2();
+      if (!optimizer_->currentEstimate().exists(second_key) && gtsam::Symbol(second_key).chr() == robot_id_char_) {
+         // Get previous pose
+         auto previous_pose = poses_initial_guess_->at<gtsam::Pose3>(first_key);
+
+         // Compose previous pose and measurement
+         auto current_pose = previous_pose * between_factor->measured();
+
+         // Update pose in initial guess
+         poses_initial_guess_->update(second_key ,current_pose);
+      }
+   }
    WriteOptimizedDataset();
 }
 
