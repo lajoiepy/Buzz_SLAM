@@ -555,7 +555,9 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 7);
    buzzvm_lload(vm, 8);
    buzzvm_lload(vm, 9);
+   buzzvm_lload(vm, 10);
    /* Retrieve parameters and check their types */
+   buzzobj_t b_incremental_solving = buzzvm_stack_at(vm, 10);
    buzzobj_t b_debug = buzzvm_stack_at(vm, 9);
    buzzobj_t b_rotation_noise_std = buzzvm_stack_at(vm, 8);
    buzzobj_t b_translation_noise_std = buzzvm_stack_at(vm, 7);
@@ -567,7 +569,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzobj_t b_error_file_name = buzzvm_stack_at(vm, 1);
    float rotation_noise_std, translation_noise_std, 
       rotation_estimate_change_threshold, translation_estimate_change_threshold;
-   bool use_flagged_initialization, is_simulation, debug;
+   bool use_flagged_initialization, is_simulation, debug, incremental_solving;
    int number_of_robots;
    std::string error_file_name;
 
@@ -579,7 +581,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_is_simulation->o.type == BUZZTYPE_INT &&
       b_number_of_robots->o.type == BUZZTYPE_INT &&
       b_error_file_name->o.type == BUZZTYPE_STRING &&
-      b_debug->o.type == BUZZTYPE_INT) {
+      b_debug->o.type == BUZZTYPE_INT &&
+      b_incremental_solving->o.type == BUZZTYPE_INT) {
 
       // Fill in variables
       rotation_noise_std = b_rotation_noise_std->f.value;
@@ -591,6 +594,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       number_of_robots = b_number_of_robots->i.value;
       error_file_name = b_error_file_name->s.value.str;
       debug = b_debug->i.value;
+      incremental_solving = b_incremental_solving->i.value;
 
    } else {
       buzzvm_seterror(vm,
@@ -603,7 +607,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(debug,
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(incremental_solving, debug,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, translation_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,
@@ -698,6 +702,43 @@ static int BuzzNeighborPoseEstimationIsFinished(buzzvm_t vm){
 }
 
 /****************************************/
+/****************************************/
+
+static int BuzzNeighborState(buzzvm_t vm){
+
+   buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
+   
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 2);
+   int rid;
+   buzzobj_t buzz_state = buzzvm_stack_at(vm, 1);
+   int state;
+
+   if(buzz_rid->o.type == BUZZTYPE_INT &&
+      buzz_state->o.type == BUZZTYPE_INT) {
+      rid = buzz_rid->i.value;
+      state = buzz_state->i.value;
+   }
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "BuzzNeighborState: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[buzz_rid->o.type]
+         );
+      return vm->state;
+   } 
+
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborState(rid, (buzz_quadmapper::OptimizerState) state);
+
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
 /************ Registration **************/
 /****************************************/
 
@@ -783,6 +824,10 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "check_if_all_estimation_done_and_reset", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzCheckIfAllEstimationDoneAndReset));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "neighbor_state", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzNeighborState));
    buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;

@@ -64,7 +64,7 @@ public:
 
    virtual void Init(TConfigurationNode& t_node);
 
-   void LoadParameters( const bool& debug,
+   void LoadParameters( const bool& incremental_solving, const bool& debug,
                         const float& rotation_noise_std, const float& translation_noise_std,
                         const float& rotation_estimate_change_threshold, const float& translation_estimate_change_threshold,
                         const bool& use_flagged_initialization, const bool& is_simulation,
@@ -116,6 +116,8 @@ public:
    OptimizerPhase GetOptimizerPhase();
 
    void CheckIfAllEstimationDoneAndReset();
+
+   void NeighborState(const int& rid, const OptimizerState& state);
 
 protected:
 
@@ -209,11 +211,13 @@ protected:
 
    std::map<int, bool> neighbors_rotation_estimation_phase_is_finished_, neighbors_pose_estimation_phase_is_finished_, neighbors_is_estimation_done_;
 
+   std::map<int, OptimizerState> neighbors_state_;
+
    bool is_estimation_done_;
 
    gtsam::NonlinearFactorGraph local_pose_graph_before_optimization_;
 
-   // Constants that should be parameters in the future
+   // Parameters
    double rotation_noise_std_, translation_noise_std_;
 
    gtsam::SharedNoiseModel noise_model_;
@@ -227,6 +231,8 @@ protected:
    bool debug_;
 
    int end_delay_;
+
+   bool incremental_solving_;
 
    // Parameter for evaluation
    int number_of_robots_;
