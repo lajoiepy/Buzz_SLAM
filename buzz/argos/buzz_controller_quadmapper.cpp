@@ -208,7 +208,6 @@ void CBuzzControllerQuadMapper::NeighborState(const int& rid, const OptimizerSta
 /****************************************/
 
 OptimizerPhase CBuzzControllerQuadMapper::GetOptimizerPhase() {
-   //CheckIfAllEstimationDoneAndReset();
    if (is_estimation_done_) {
       if (debug_) {
          std::cout << "Robot " << robot_id_ << " Phase : " << OptimizerPhase::Communication << std::endl;
@@ -217,11 +216,12 @@ OptimizerPhase CBuzzControllerQuadMapper::GetOptimizerPhase() {
    }
    // Smallest ID not done -> estimation
    bool smallest_id_not_done = true;
-   for (const auto& neighbor_done : neighbors_is_estimation_done_) {
-      if (!neighbor_done.second && neighbor_done.first < robot_id_) {
+   if (robot_id_ > 0) {
+      auto previous_neighbor_done = neighbors_is_estimation_done_[robot_id_-1];
+      if (!previous_neighbor_done) {
          smallest_id_not_done = false;
       }
-   }
+   }      
    auto phase = OptimizerPhase::Communication;
    if (smallest_id_not_done && !neighbors_is_estimation_done_.empty()) {
       phase = OptimizerPhase::Estimation;
@@ -475,6 +475,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
          TablePut(b_individual_estimate, "sender_robot_id", robot_id_);
          int robot_pose_id = separator_symbols.second.index();
          TablePut(b_individual_estimate, "sender_pose_id", robot_pose_id);
+         TablePut(b_individual_estimate, "receiver_robot_id", other_robot_id);
          TablePut(b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
          TablePut(b_individual_estimate, "sender_estimation_is_done", (int) is_estimation_done_);
 
@@ -509,14 +510,18 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
    }
    for (const auto& rotation_estimates_from_one_robot : rotation_estimates_from_all_robot) {
       for (const auto& rotation_estimate : rotation_estimates_from_one_robot) {
-         gtsam::Symbol symbol((unsigned char)(rotation_estimate.sender_robot_id+97), rotation_estimate.sender_pose_id);
-         gtsam::Vector rotation_matrix_vector(9);
-         rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
-                                 rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
-                                 rotation_estimate.rotation_matrix[6], rotation_estimate.rotation_matrix[7], rotation_estimate.rotation_matrix[8];
-         optimizer_->updateNeighborLinearizedRotations(symbol.key(), rotation_matrix_vector);
+         if (rotation_estimate.receiver_robot_id == robot_id_) {
+            gtsam::Symbol symbol((unsigned char)(rotation_estimate.sender_robot_id+97), rotation_estimate.sender_pose_id);
+            gtsam::Vector rotation_matrix_vector(9);
+            rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
+                                    rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
+                                    rotation_estimate.rotation_matrix[6], rotation_estimate.rotation_matrix[7], rotation_estimate.rotation_matrix[8];
+            optimizer_->updateNeighborLinearizedRotations(symbol.key(), rotation_matrix_vector);
+            if (optimizer_state_ == OptimizerState::RotationEstimation) {
+               optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
+            }
+         }
          if (optimizer_state_ == OptimizerState::RotationEstimation) {
-            optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
             neighbors_is_estimation_done_[rotation_estimate.sender_robot_id] = rotation_estimate.sender_estimation_is_done;
          }
       }
@@ -635,6 +640,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
          TablePut(b_individual_estimate, "sender_robot_id", robot_id_);
          int robot_pose_id = separator_symbols.second.index();
          TablePut(b_individual_estimate, "sender_pose_id", robot_pose_id);
+         TablePut(b_individual_estimate, "receiver_robot_id", other_robot_id);
          TablePut(b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
          TablePut(b_individual_estimate, "sender_estimation_is_done", (int) is_estimation_done_);
 
@@ -671,13 +677,17 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
    }
    for (const auto& pose_estimates_from_one_robot : pose_estimates_from_all_robot) {
       for (const auto& pose_estimate : pose_estimates_from_one_robot) {
-         gtsam::Symbol symbol((unsigned char)(pose_estimate.sender_robot_id+97), pose_estimate.sender_pose_id);
-         gtsam::Vector pose_data_vector(6);
-         pose_data_vector << pose_estimate.pose_data[0], pose_estimate.pose_data[1], pose_estimate.pose_data[2], 
-                                 pose_estimate.pose_data[3], pose_estimate.pose_data[4], pose_estimate.pose_data[5];
-         optimizer_->updateNeighborLinearizedPoses(symbol.key(), pose_data_vector);
+         if (pose_estimate.receiver_robot_id == robot_id_) {
+            gtsam::Symbol symbol((unsigned char)(pose_estimate.sender_robot_id+97), pose_estimate.sender_pose_id);
+            gtsam::Vector pose_data_vector(6);
+            pose_data_vector << pose_estimate.pose_data[0], pose_estimate.pose_data[1], pose_estimate.pose_data[2], 
+                                    pose_estimate.pose_data[3], pose_estimate.pose_data[4], pose_estimate.pose_data[5];
+            optimizer_->updateNeighborLinearizedPoses(symbol.key(), pose_data_vector);
+            if (optimizer_state_ == OptimizerState::PoseEstimation) {
+               optimizer_->updateNeighboringRobotInitialized(symbol.chr(), pose_estimate.sender_robot_is_initialized); // Used only with flagged initialization
+            }
+         }
          if (optimizer_state_ == OptimizerState::PoseEstimation) {
-            optimizer_->updateNeighboringRobotInitialized(symbol.chr(), pose_estimate.sender_robot_is_initialized); // Used only with flagged initialization
             neighbors_is_estimation_done_[pose_estimate.sender_robot_id] = pose_estimate.sender_estimation_is_done;
          }
       }

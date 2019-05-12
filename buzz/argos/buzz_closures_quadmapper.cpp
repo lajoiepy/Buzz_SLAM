@@ -166,6 +166,13 @@ static int BuzzUpdateNeighborRotationEstimates(buzzvm_t vm){
          buzzvm_pop(vm);
 
          buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_robot_id", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_receiver_robot_id = buzzvm_stack_at(vm, 1);
+         rotation_estimate.receiver_robot_id = b_receiver_robot_id->i.value;
+         buzzvm_pop(vm);
+
+         buzzvm_dup(vm);
          buzzvm_pushs(vm, buzzvm_string_register(vm, "sender_pose_id", 1));
          buzzvm_tget(vm);
          buzzobj_t b_sender_pose_id = buzzvm_stack_at(vm, 1);
@@ -288,6 +295,13 @@ static int BuzzUpdateNeighborPoseEstimates(buzzvm_t vm){
          buzzvm_tget(vm);
          buzzobj_t b_sender_robot_id = buzzvm_stack_at(vm, 1);
          pose_estimate.sender_robot_id = b_sender_robot_id->i.value;
+         buzzvm_pop(vm);
+
+         buzzvm_dup(vm);
+         buzzvm_pushs(vm, buzzvm_string_register(vm, "receiver_robot_id", 1));
+         buzzvm_tget(vm);
+         buzzobj_t b_receiver_robot_id = buzzvm_stack_at(vm, 1);
+         pose_estimate.receiver_robot_id = b_receiver_robot_id->i.value;
          buzzvm_pop(vm);
 
          buzzvm_dup(vm);

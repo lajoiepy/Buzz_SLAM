@@ -81,7 +81,7 @@ int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& 
       ComputeNoisyFakeOdometryMeasurement();
 
       // Log data
-      WriteCurrentDataset();   
+      //WriteCurrentDataset();   
    }
 
    return number_of_poses_;

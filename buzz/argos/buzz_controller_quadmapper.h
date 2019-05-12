@@ -33,6 +33,7 @@ enum OptimizerPhase { Communication, Estimation };
 */
 typedef struct {
    int sender_robot_id;
+   int receiver_robot_id;
    int sender_pose_id;
    bool sender_robot_is_initialized;
    bool sender_estimation_is_done;
@@ -44,6 +45,7 @@ typedef struct {
 */
 typedef struct {
    int sender_robot_id;
+   int receiver_robot_id;
    int sender_pose_id;
    bool sender_robot_is_initialized;
    bool sender_estimation_is_done;
