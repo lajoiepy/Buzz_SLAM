@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <cmath> 
+#include "boost/filesystem.hpp"
 
 namespace buzz_quadmapper {
 /****************************************/
@@ -42,6 +43,15 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
 
    // Save ground truth for fake separator creation
    SavePoseGroundTruth();
+
+   // Initialize log files
+   if (is_simulation_ && robot_id_ ==  0 && !boost::filesystem::exists(error_file_name_)) {
+      // Write results to csv
+      std::ofstream error_file;
+      error_file.open(error_file_name_, std::ios::out | std::ios::app);
+      error_file << "NumberOfRobots\tNumberOfPoses\tNumberOfSeparators\tProbabilityOfOutliers\tUsesIncrementalSolving\tRotationNoiseStd\tTranslationNoiseStd\tRotationChangeThreshold\tPoseChangeThreshold\tErrorCentralized\tErrorDecentralized\tErrorInitial\tNumberOfRotationIterations\tNumberOfPoseIterations\n";
+      error_file.close();
+   }
 }
 
 /****************************************/
@@ -274,4 +284,69 @@ void CBuzzControllerQuadMapperNoSensing::SavePoseGroundTruth(){
    gtsam::Pose3 pose_gt(R_gt, t_gt);
    ground_truth_poses_.insert(std::make_pair(number_of_poses_, pose_gt));   
 }
+
+
+/****************************************/
+/****************************************/
+
+bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError() {
+   // Collect expected estimate size
+   std::string local_dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
+   gtsam::GraphAndValues local_graph_and_values = gtsam::readG2o(local_dataset_file_name, true);
+   int expected_size = local_graph_and_values.second->size();
+
+   // Aggregate estimates from all the robots
+   gtsam::Values distributed;
+   std::vector<gtsam::GraphAndValues> graph_and_values_vec;
+   int number_of_separators = 0;
+   for (size_t i = 0; i < number_of_robots_; i++) {
+      std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_optimized.g2o";
+      if (!boost::filesystem::exists(dataset_file_name)) {
+         return false; // File does not exists yet
+      }
+      gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
+      if (graph_and_values.second->size() != expected_size) {
+         return false; // File not update yet
+      }
+      for (const gtsam::Values::ConstKeyValuePair &key_value: *graph_and_values.second) {
+         gtsam::Key key = key_value.key;
+         if (!distributed.exists(key)) {
+            distributed.insert(key, (*graph_and_values.second).at<gtsam::Pose3>(key));
+         }
+      }
+      for (const auto &factor: *graph_and_values.first) {
+         boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3> > pose3_between = boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3> >(factor);
+         auto robot_1_id = gtsam::Symbol(pose3_between->key1()).chr();
+         auto robot_2_id = gtsam::Symbol(pose3_between->key2()).chr();
+         if (robot_1_id != robot_2_id) {
+            number_of_separators ++;
+         }
+      }
+      dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial.g2o";
+      graph_and_values = gtsam::readG2o(dataset_file_name, true);
+      graph_and_values_vec.push_back(graph_and_values);
+   }
+   gtsam::GraphAndValues full_graph_and_values = distributed_mapper::evaluation_utils::readFullGraph(number_of_robots_, graph_and_values_vec);
+
+   // Compute Error
+   gtsam::noiseModel::Diagonal::shared_ptr evaluation_model = gtsam::noiseModel::Isotropic::Variance(6, 1e-12);
+   auto errors = distributed_mapper::evaluation_utils::evaluateEstimates(number_of_robots_,
+                                                      full_graph_and_values,
+                                                      evaluation_model,
+                                                      chordal_graph_noise_model_,
+                                                      false,
+                                                      distributed );
+
+   // Write results to csv
+   std::ofstream error_file;
+   error_file.open(error_file_name_, std::ios::out | std::ios::app);
+   auto number_of_poses = optimizer_->numberOfPosesInCurrentEstimate();
+   error_file << number_of_robots_ << "\t" << number_of_poses << "\t" << number_of_separators << "\t" << outlier_probability_ << std::boolalpha << "\t" << incremental_solving_
+            << "\t" << rotation_noise_std_ << "\t" << translation_noise_std_ << "\t" << rotation_estimate_change_threshold_ << "\t" << pose_estimate_change_threshold_
+            << "\t" << std::get<0>(errors) << "\t" << std::get<1>(errors) << "\t" << std::get<2>(errors) << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ << "\n";
+   error_file.close();
+
+   return std::abs(std::get<0>(errors) - std::get<1>(errors)) < 0.1;
+}
+
 }

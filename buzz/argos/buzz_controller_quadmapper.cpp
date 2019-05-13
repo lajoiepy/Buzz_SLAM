@@ -2,9 +2,9 @@
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
-#include "boost/filesystem.hpp"
 #include <iostream>
 #include <fstream>
+#include <stdio.h>
 
 namespace buzz_quadmapper {
 /****************************************/
@@ -45,14 +45,15 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    noise_model_ = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
    chordal_graph_noise_model_ = gtsam::noiseModel::Isotropic::Variance(12, 1);
 
-   // Initialize log files
-   if (is_simulation_ && robot_id_ ==  0 && !boost::filesystem::exists(error_file_name_)) {
-      // Write results to csv
-      std::ofstream error_file;
-      error_file.open(error_file_name_, std::ios::out | std::ios::app);
-      error_file << "NumberOfRobots\tNumberOfPoses\tErrorCentralized\tErrorDecentralized\tNumberOfRotationIterations\tNumberOfPoseIterations\n";
-      error_file.close();
-   }
+   // Delete existent log files
+   std::remove("log/datasets/centralized.g2o");
+   std::string log_file_name = "log/datasets/" + std::to_string(robot_id_) + ".g2o";
+   std::remove(log_file_name.c_str());
+   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
+   std::remove(log_file_name.c_str());
+   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
+   std::remove(log_file_name.c_str());
+
 }
 
 /****************************************/
@@ -60,13 +61,13 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
 
 void CBuzzControllerQuadMapper::LoadParameters( const bool& incremental_solving, const bool& debug,
                                                 const float& rotation_noise_std, const float& translation_noise_std,
-                                                const float& rotation_estimate_change_threshold, const float& translation_estimate_change_threshold,
+                                                const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                                                 const bool& use_flagged_initialization, const bool& is_simulation,
                                                 const int& number_of_robots, const std::string& error_file_name) {
    rotation_noise_std_ = rotation_noise_std;
    translation_noise_std_ = translation_noise_std;
    rotation_estimate_change_threshold_ = rotation_estimate_change_threshold;
-   pose_estimate_change_threshold_ = translation_estimate_change_threshold;
+   pose_estimate_change_threshold_ = pose_estimate_change_threshold;
    use_flagged_initialization_ = use_flagged_initialization;
 
    number_of_robots_ = number_of_robots;
@@ -438,6 +439,7 @@ void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& r
    neighbors_rotation_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
    neighbors_pose_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
    neighbors_is_estimation_done_.insert(std::make_pair(rid, false));
+   std::cout << "Robot " << robot_id_ << " : Add neighbor " << rid << std::endl;
 }
 
 /****************************************/
@@ -510,7 +512,8 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
    }
    for (const auto& rotation_estimates_from_one_robot : rotation_estimates_from_all_robot) {
       for (const auto& rotation_estimate : rotation_estimates_from_one_robot) {
-         if (rotation_estimate.receiver_robot_id == robot_id_) {
+         if (rotation_estimate.receiver_robot_id == robot_id_ &&
+             std::find(neighbors_within_communication_range_.begin(), neighbors_within_communication_range_.end(), rotation_estimate.sender_robot_id) != neighbors_within_communication_range_.end()) {
             gtsam::Symbol symbol((unsigned char)(rotation_estimate.sender_robot_id+97), rotation_estimate.sender_pose_id);
             gtsam::Vector rotation_matrix_vector(9);
             rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
@@ -677,7 +680,8 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
    }
    for (const auto& pose_estimates_from_one_robot : pose_estimates_from_all_robot) {
       for (const auto& pose_estimate : pose_estimates_from_one_robot) {
-         if (pose_estimate.receiver_robot_id == robot_id_) {
+         if (pose_estimate.receiver_robot_id == robot_id_ &&
+             std::find(neighbors_within_communication_range_.begin(), neighbors_within_communication_range_.end(), pose_estimate.sender_robot_id) != neighbors_within_communication_range_.end()) {
             gtsam::Symbol symbol((unsigned char)(pose_estimate.sender_robot_id+97), pose_estimate.sender_pose_id);
             gtsam::Vector pose_data_vector(6);
             pose_data_vector << pose_estimate.pose_data[0], pose_estimate.pose_data[1], pose_estimate.pose_data[2], 
@@ -711,14 +715,18 @@ void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
 /****************************************/
 
 void CBuzzControllerQuadMapper::NeighborRotationEstimationIsFinished(const int& rid) {
-   neighbors_rotation_estimation_phase_is_finished_.at(rid) = true;
+   if ( std::find(neighbors_within_communication_range_.begin(), neighbors_within_communication_range_.end(), rid) != neighbors_within_communication_range_.end() ) {
+      neighbors_rotation_estimation_phase_is_finished_.at(rid) = true;
+   }
 }
 
 /****************************************/
 /****************************************/
 
 void CBuzzControllerQuadMapper::NeighborPoseEstimationIsFinished(const int& rid) {
-   neighbors_pose_estimation_phase_is_finished_.at(rid) = true;
+   if ( std::find(neighbors_within_communication_range_.begin(), neighbors_within_communication_range_.end(), rid) != neighbors_within_communication_range_.end() ) {
+      neighbors_pose_estimation_phase_is_finished_.at(rid) = true;
+   }
 }
 
 /****************************************/
@@ -817,52 +825,7 @@ double CBuzzControllerQuadMapper::GetLatestLocalError() {
 /****************************************/
 
 bool CBuzzControllerQuadMapper::CompareCentralizedAndDecentralizedError() {
-   // Collect expected estimate size
-   std::string local_dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
-   gtsam::GraphAndValues local_graph_and_values = gtsam::readG2o(local_dataset_file_name, true);
-   int expected_size = local_graph_and_values.second->size();
 
-   // Aggregate estimates from all the robots
-   gtsam::Values distributed;
-   std::vector<gtsam::GraphAndValues> graph_and_values_vec;
-   for (size_t i = 0; i < number_of_robots_; i++) {
-      std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_optimized.g2o";
-      if (!boost::filesystem::exists(dataset_file_name)) {
-         return false; // File does not exists yet
-      }
-      gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
-      if (graph_and_values.second->size() != expected_size) {
-         return false; // File not update yet
-      }
-      for (const gtsam::Values::ConstKeyValuePair &key_value: *graph_and_values.second) {
-         gtsam::Key key = key_value.key;
-         if (!distributed.exists(key)) {
-            distributed.insert(key, (*graph_and_values.second).at<gtsam::Pose3>(key));
-         }
-      }
-      dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial.g2o";
-      graph_and_values = gtsam::readG2o(dataset_file_name, true);
-      graph_and_values_vec.push_back(graph_and_values);
-   }
-   gtsam::GraphAndValues full_graph_and_values = distributed_mapper::evaluation_utils::readFullGraph(number_of_robots_, graph_and_values_vec);
-
-   // Compute Error
-   gtsam::noiseModel::Diagonal::shared_ptr evaluation_model = gtsam::noiseModel::Isotropic::Variance(6, 1e-12);
-   auto errors = distributed_mapper::evaluation_utils::evaluateEstimates(number_of_robots_,
-                                                      full_graph_and_values,
-                                                      evaluation_model,
-                                                      chordal_graph_noise_model_,
-                                                      false,
-                                                      distributed );
-
-   // Write results to csv
-   std::ofstream error_file;
-   error_file.open(error_file_name_, std::ios::out | std::ios::app);
-   auto number_of_poses = optimizer_->numberOfPosesInCurrentEstimate();
-   error_file << number_of_robots_ << "\t" << number_of_poses << "\t" << errors.first << "\t" << errors.second << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ << "\n";
-   error_file.close();
-
-   return std::abs(errors.first - errors.second) < 0.1;
 }
 
 }

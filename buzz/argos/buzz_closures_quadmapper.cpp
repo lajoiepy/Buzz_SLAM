@@ -576,13 +576,13 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzobj_t b_rotation_noise_std = buzzvm_stack_at(vm, 8);
    buzzobj_t b_translation_noise_std = buzzvm_stack_at(vm, 7);
    buzzobj_t b_rotation_estimate_change_threshold = buzzvm_stack_at(vm, 6);
-   buzzobj_t b_translation_estimate_change_threshold = buzzvm_stack_at(vm, 5);
+   buzzobj_t b_pose_estimate_change_threshold = buzzvm_stack_at(vm, 5);
    buzzobj_t b_use_flagged_initialization = buzzvm_stack_at(vm, 4);
    buzzobj_t b_is_simulation = buzzvm_stack_at(vm, 3);
    buzzobj_t b_number_of_robots = buzzvm_stack_at(vm, 2);
    buzzobj_t b_error_file_name = buzzvm_stack_at(vm, 1);
    float rotation_noise_std, translation_noise_std, 
-      rotation_estimate_change_threshold, translation_estimate_change_threshold;
+      rotation_estimate_change_threshold, pose_estimate_change_threshold;
    bool use_flagged_initialization, is_simulation, debug, incremental_solving;
    int number_of_robots;
    std::string error_file_name;
@@ -590,7 +590,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    if(b_rotation_noise_std->o.type == BUZZTYPE_FLOAT &&
       b_translation_noise_std->o.type == BUZZTYPE_FLOAT &&
       b_rotation_estimate_change_threshold->o.type == BUZZTYPE_FLOAT &&
-      b_translation_estimate_change_threshold->o.type == BUZZTYPE_FLOAT &&
+      b_pose_estimate_change_threshold->o.type == BUZZTYPE_FLOAT &&
       b_use_flagged_initialization->o.type == BUZZTYPE_INT &&
       b_is_simulation->o.type == BUZZTYPE_INT &&
       b_number_of_robots->o.type == BUZZTYPE_INT &&
@@ -602,7 +602,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       rotation_noise_std = b_rotation_noise_std->f.value;
       translation_noise_std = b_translation_noise_std->f.value;
       rotation_estimate_change_threshold = b_rotation_estimate_change_threshold->f.value;
-      translation_estimate_change_threshold = b_translation_estimate_change_threshold->f.value;
+      pose_estimate_change_threshold = b_pose_estimate_change_threshold->f.value;
       use_flagged_initialization = (bool) b_use_flagged_initialization->i.value;
       is_simulation = (bool) b_is_simulation->i.value;
       number_of_robots = b_number_of_robots->i.value;
@@ -623,7 +623,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    /* Call function */
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(incremental_solving, debug,
                      rotation_noise_std, translation_noise_std,
-                     rotation_estimate_change_threshold, translation_estimate_change_threshold,
+                     rotation_estimate_change_threshold, pose_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,
                      number_of_robots, error_file_name);
    return buzzvm_ret0(vm);

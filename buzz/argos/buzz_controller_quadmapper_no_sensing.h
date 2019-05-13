@@ -47,6 +47,8 @@ protected:
    // Functions for link with buzz VM
    virtual buzzvm_state RegisterFunctions();
 
+   virtual bool CompareCentralizedAndDecentralizedError();
+
 private:
 
    // Ground truth information to compute fake measurements

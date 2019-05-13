@@ -68,7 +68,7 @@ public:
 
    void LoadParameters( const bool& incremental_solving, const bool& debug,
                         const float& rotation_noise_std, const float& translation_noise_std,
-                        const float& rotation_estimate_change_threshold, const float& translation_estimate_change_threshold,
+                        const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                         const bool& use_flagged_initialization, const bool& is_simulation,
                         const int& number_of_robots, const std::string& error_file_name);
 
@@ -172,7 +172,7 @@ protected:
 
    bool AllRobotsAreInitialized();
 
-   bool CompareCentralizedAndDecentralizedError();
+   virtual bool CompareCentralizedAndDecentralizedError();
 
    void UpdateOptimizerPhase();
 
