@@ -59,7 +59,8 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::LoadParameters( const double& confidence_probability, const bool& incremental_solving, const bool& debug,
+void CBuzzControllerQuadMapper::LoadParameters( const bool& use_pcm,
+                                                const double& confidence_probability, const bool& incremental_solving, const bool& debug,
                                                 const float& rotation_noise_std, const float& translation_noise_std,
                                                 const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                                                 const bool& use_flagged_initialization, const bool& is_simulation,
@@ -76,6 +77,7 @@ void CBuzzControllerQuadMapper::LoadParameters( const double& confidence_probabi
    debug_ = debug;
    incremental_solving_ = incremental_solving;
    confidence_probability_ = confidence_probability;
+   use_pcm_ = use_pcm;
 }
 
 /****************************************/
@@ -431,22 +433,24 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
 
 void CBuzzControllerQuadMapper::OutliersFiltering() {
    
-   // Perform pairwise consistency maximization
-   int total_max_clique_size = 0;
-   for (const auto& robot : neighbors_within_communication_range_) {
-      gtsam::Values other_robot_poses;
-      for (const auto& estimate_pair : pose_estimates_from_neighbors_.at(robot)) {
-         other_robot_poses.insert(estimate_pair.first, estimate_pair.second);
-      }      
-      bool use_covariance = false;
-      int max_clique_size = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
-                              graph_and_values_, other_robot_poses,
-                              confidence_probability_, use_covariance);
-      total_max_clique_size += max_clique_size;
-   }
+   if (use_pcm_) {
+      // Perform pairwise consistency maximization
+      int total_max_clique_size = 0;
+      for (const auto& robot : neighbors_within_communication_range_) {
+         gtsam::Values other_robot_poses;
+         for (const auto& estimate_pair : pose_estimates_from_neighbors_.at(robot)) {
+            other_robot_poses.insert(estimate_pair.first, estimate_pair.second);
+         }      
+         bool use_covariance = false;
+         int max_clique_size = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
+                                 graph_and_values_, other_robot_poses,
+                                 confidence_probability_, use_covariance);
+         total_max_clique_size += max_clique_size;
+      }
 
-   if (debug_) {
-      std::cout << "Outliers filtering, total max clique size=" << total_max_clique_size << std::endl;
+      if (debug_) {
+         std::cout << "Robot " << robot_id_ << " Outliers filtering, total max clique size=" << total_max_clique_size << std::endl;
+      }
    }
 
 }
@@ -457,10 +461,11 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
 void CBuzzControllerQuadMapper::UpdateCurrentPoseEstimate(const int& pose_id) {
    buzzobj_t b_pose_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
    auto pose = poses_initial_guess_->at<gtsam::Pose3>(gtsam::Symbol(robot_id_char_, pose_id).key());
-   auto matrix = pose.matrix();
+   auto pose_matrix = pose.matrix();
    for (int i = 0; i < 4; i++) {
-      for (int j = 0; i < 4; i++) {
-         TablePut(b_pose_estimate, i*4 + j, matrix(i, j));
+      for (int j = 0; j < 4; j++) {
+         double matrix_elem = pose_matrix(i, j);
+         TablePut(b_pose_estimate, i*4 + j, matrix_elem);
       }
    }
    // Register pose estimate data table as a global symbol

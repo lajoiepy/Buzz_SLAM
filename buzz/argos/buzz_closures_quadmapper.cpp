@@ -401,26 +401,47 @@ static int BuzzUpdatePoseEstimateFromNeighbor(buzzvm_t vm){
    buzzobj_t b_rid = buzzvm_stack_at(vm, 3);
    buzzobj_t b_pose_id = buzzvm_stack_at(vm, 2);
 
-   buzzvm_type_assert(vm, 1, BUZZTYPE_TABLE);
-   buzzvm_type_assert(vm, 2, BUZZTYPE_INT);
    buzzvm_type_assert(vm, 3, BUZZTYPE_INT);
+   buzzvm_type_assert(vm, 2, BUZZTYPE_INT);
+   buzzvm_type_assert(vm, 1, BUZZTYPE_TABLE);
 
-   gtsam::Matrix4 estimate;
-   
    buzzobj_t b_estimate = buzzvm_stack_at(vm, 1);
 
-   for (int32_t i = 0; i < buzzdict_size(b_estimate->t.value); ++i) {
+   int table_size = buzzdict_size(b_estimate->t.value);
+   double estimate_elem;
+   std::vector<double> pose_estimate;
+   for (int32_t i = 0; i < table_size; ++i) {
       buzzvm_dup(vm);
       buzzvm_pushi(vm, i);
       buzzvm_tget(vm);
+      buzzvm_type_assert(vm, 1, BUZZTYPE_FLOAT);
       buzzobj_t b_estimate_elem = buzzvm_stack_at(vm, 1);
       buzzvm_pop(vm);
-      estimate(i%4, i - ((int)(i/4))*4) = b_estimate_elem->f.value;
+      estimate_elem = b_estimate_elem->f.value;
+      pose_estimate.emplace_back(estimate_elem);
    }
+
+   gtsam::Matrix4 estimate_matrix;
+   estimate_matrix(0,0) = pose_estimate.at(0);
+   estimate_matrix(0,1) = pose_estimate.at(1);
+   estimate_matrix(0,2) = pose_estimate.at(2);
+   estimate_matrix(0,3) = pose_estimate.at(3);
+   estimate_matrix(1,0) = pose_estimate.at(4);
+   estimate_matrix(1,1) = pose_estimate.at(5);
+   estimate_matrix(1,2) = pose_estimate.at(6);
+   estimate_matrix(1,3) = pose_estimate.at(7);
+   estimate_matrix(2,0) = pose_estimate.at(8);
+   estimate_matrix(2,1) = pose_estimate.at(9);
+   estimate_matrix(2,2) = pose_estimate.at(10);
+   estimate_matrix(2,3) = pose_estimate.at(11);
+   estimate_matrix(3,0) = pose_estimate.at(12);
+   estimate_matrix(3,1) = pose_estimate.at(13);
+   estimate_matrix(3,2) = pose_estimate.at(14);
+   estimate_matrix(3,3) = pose_estimate.at(15);
+   gtsam::Pose3 pose(estimate_matrix);
 
    int rid = b_rid->i.value;
    int pose_id = b_pose_id->i.value;
-   gtsam::Pose3 pose(estimate);
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdatePoseEstimateFromNeighbor(rid, pose_id, pose);
@@ -638,7 +659,9 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 9);
    buzzvm_lload(vm, 10);
    buzzvm_lload(vm, 11);
+   buzzvm_lload(vm, 12);
    /* Retrieve parameters and check their types */
+   buzzobj_t b_use_pcm = buzzvm_stack_at(vm, 12);
    buzzobj_t b_confidence_probability = buzzvm_stack_at(vm, 11);
    buzzobj_t b_incremental_solving = buzzvm_stack_at(vm, 10);
    buzzobj_t b_debug = buzzvm_stack_at(vm, 9);
@@ -656,6 +679,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    int number_of_robots;
    std::string error_file_name;
    double confidence_probability;
+   bool use_pcm;
 
    if(b_rotation_noise_std->o.type == BUZZTYPE_FLOAT &&
       b_translation_noise_std->o.type == BUZZTYPE_FLOAT &&
@@ -667,7 +691,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_error_file_name->o.type == BUZZTYPE_STRING &&
       b_debug->o.type == BUZZTYPE_INT &&
       b_incremental_solving->o.type == BUZZTYPE_INT &&
-      b_confidence_probability->o.type == BUZZTYPE_FLOAT) {
+      b_confidence_probability->o.type == BUZZTYPE_FLOAT &&
+      b_use_pcm->o.type == BUZZTYPE_INT) {
 
       // Fill in variables
       rotation_noise_std = b_rotation_noise_std->f.value;
@@ -681,6 +706,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       debug = b_debug->i.value;
       incremental_solving = b_incremental_solving->i.value;
       confidence_probability = b_confidence_probability->f.value;
+      use_pcm = (bool) b_use_pcm->i.value;
 
    } else {
       buzzvm_seterror(vm,
@@ -693,7 +719,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(confidence_probability, incremental_solving, debug,
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(use_pcm, confidence_probability, incremental_solving, debug,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,
