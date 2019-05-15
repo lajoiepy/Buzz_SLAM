@@ -397,8 +397,21 @@ void CBuzzControllerQuadMapper::StartPoseGraphOptimization() {
 
    OutliersFiltering();
 
+   SaveInitialGraph();
+
    optimizer_->updateInitialized(false);
    optimizer_->clearNeighboringRobotInit();
+
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::SaveInitialGraph() {
+
+   // Save state before optimization
+   local_pose_graph_before_optimization_ = *local_pose_graph_;
+   WriteInitialDataset();
 
 }
 
@@ -421,10 +434,6 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
    if (neighboring_robots.size() > 0) {
       disconnected_graph_ = false;
    }
-
-   // Save state before optimization
-   local_pose_graph_before_optimization_ = *local_pose_graph_;
-   WriteInitialDataset();
    
 }
 

@@ -158,6 +158,8 @@ protected:
 
    void UpdateOptimizer();
 
+   void SaveInitialGraph();
+
    void OutliersFiltering();
 
    void AddNewKnownRobot(const unsigned char& other_robot_char);
