@@ -59,7 +59,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::LoadParameters( const bool& incremental_solving, const bool& debug,
+void CBuzzControllerQuadMapper::LoadParameters( const double& confidence_probability, const bool& incremental_solving, const bool& debug,
                                                 const float& rotation_noise_std, const float& translation_noise_std,
                                                 const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                                                 const bool& use_flagged_initialization, const bool& is_simulation,
@@ -75,6 +75,7 @@ void CBuzzControllerQuadMapper::LoadParameters( const bool& incremental_solving,
    error_file_name_ = error_file_name;
    debug_ = debug;
    incremental_solving_ = incremental_solving;
+   confidence_probability_ = confidence_probability;
 }
 
 /****************************************/
@@ -299,6 +300,8 @@ void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
    // Factor
    gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_1_symbol, robot_2_symbol, transformation, noise_model_);
    local_pose_graph_->push_back(new_factor);
+
+   // Save other robot pose
 }
 
 /****************************************/
@@ -420,6 +423,7 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
    // Save state before optimization
    local_pose_graph_before_optimization_ = *local_pose_graph_;
    WriteInitialDataset();
+   
 }
 
 /****************************************/
@@ -428,7 +432,56 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
 void CBuzzControllerQuadMapper::OutliersFiltering() {
    
    // Perform pairwise consistency maximization
+   int total_max_clique_size = 0;
+   for (const auto& robot : neighbors_within_communication_range_) {
+      gtsam::Values other_robot_poses;
+      for (const auto& estimate_pair : pose_estimates_from_neighbors_.at(robot)) {
+         other_robot_poses.insert(estimate_pair.first, estimate_pair.second);
+      }      
+      int max_clique_size = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
+                              graph_and_values_, other_robot_poses,
+                              confidence_probability_, false);
+      total_max_clique_size += max_clique_size;
+   }
 
+   if (debug_) {
+      std::cout << "Outliers filtering, total max clique size=" << total_max_clique_size << std::endl;
+   }
+
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::UpdateCurrentPoseEstimate(const int& pose_id) {
+   buzzobj_t b_pose_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+   auto pose = poses_initial_guess_->at<gtsam::Pose3>(gtsam::Symbol(robot_id_char_, pose_id).key());
+   auto matrix = pose.matrix();
+   for (int i = 0; i < 4; i++) {
+      for (int j = 0; i < 4; i++) {
+         TablePut(b_pose_estimate, i*4 + j, matrix(i, j));
+      }
+   }
+   // Register pose estimate data table as a global symbol
+   Register("current_pose_estimate", b_pose_estimate);
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id, const gtsam::Pose3& pose) {
+   auto key = gtsam::Symbol(((char)rid+97), pose_id).key();
+   if (pose_estimates_from_neighbors_.find(rid) != pose_estimates_from_neighbors_.end()) {
+      if (pose_estimates_from_neighbors_.at(rid).find(key) != pose_estimates_from_neighbors_.at(rid).end()) {
+         pose_estimates_from_neighbors_.at(rid).at(key) = pose;
+      } else {
+         pose_estimates_from_neighbors_.at(rid).insert(std::make_pair(key, pose));
+      }
+   } else {
+      std::map<gtsam::Key, gtsam::Pose3> new_map;
+      new_map.insert(std::make_pair(key, pose));
+      pose_estimates_from_neighbors_.insert(std::make_pair(rid, new_map));
+   }
 }
 
 /****************************************/
@@ -439,7 +492,6 @@ void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& r
    neighbors_rotation_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
    neighbors_pose_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
    neighbors_is_estimation_done_.insert(std::make_pair(rid, false));
-   std::cout << "Robot " << robot_id_ << " : Add neighbor " << rid << std::endl;
 }
 
 /****************************************/
@@ -496,7 +548,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
 
    }
 
-   // Register positioning data table as global symbol
+   // Register positioning data table as a global symbol
    Register("rotation_estimates_to_send", b_rotation_estimates);
    if (debug_) {
       std::cout << "Robot " << robot_id_ << " Rotation Send" << std::endl;

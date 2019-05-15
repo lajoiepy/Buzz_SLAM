@@ -361,6 +361,73 @@ static int BuzzEstimatePoseAndUpdatePose(buzzvm_t vm) {
    buzzvm_gload(vm);
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->EstimatePoseAndUpdatePose();
 }
+
+/****************************************/
+/****************************************/
+
+static int BuzzUpdateCurrentPoseEstimate(buzzvm_t vm) {buzzvm_lload(vm, 1);
+   
+   buzzobj_t buzz_pose_id = buzzvm_stack_at(vm, 1);
+   int pose_id;
+
+   if(buzz_pose_id->o.type == BUZZTYPE_INT) pose_id = buzz_pose_id->i.value;
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "BuzzUpdateCurrentPoseEstimate: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[buzz_pose_id->o.type]
+         );
+      return vm->state;
+   } 
+
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateCurrentPoseEstimate(pose_id);
+
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzUpdatePoseEstimateFromNeighbor(buzzvm_t vm){
+
+   buzzvm_lnum_assert(vm, 3);
+
+   buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
+   buzzvm_lload(vm, 3);
+   buzzobj_t b_rid = buzzvm_stack_at(vm, 3);
+   buzzobj_t b_pose_id = buzzvm_stack_at(vm, 2);
+
+   buzzvm_type_assert(vm, 1, BUZZTYPE_TABLE);
+   buzzvm_type_assert(vm, 2, BUZZTYPE_INT);
+   buzzvm_type_assert(vm, 3, BUZZTYPE_INT);
+
+   gtsam::Matrix4 estimate;
+   
+   buzzobj_t b_estimate = buzzvm_stack_at(vm, 1);
+
+   for (int32_t i = 0; i < buzzdict_size(b_estimate->t.value); ++i) {
+      buzzvm_dup(vm);
+      buzzvm_pushi(vm, i);
+      buzzvm_tget(vm);
+      buzzobj_t b_estimate_elem = buzzvm_stack_at(vm, 1);
+      buzzvm_pop(vm);
+      estimate(i%4, i - ((int)(i/4))*4) = b_estimate_elem->f.value;
+   }
+
+   int rid = b_rid->i.value;
+   int pose_id = b_pose_id->i.value;
+   gtsam::Pose3 pose(estimate);
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdatePoseEstimateFromNeighbor(rid, pose_id, pose);
+
+   return buzzvm_ret0(vm);
+}
+
 /****************************************/
 /****************************************/
 
@@ -570,7 +637,9 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 8);
    buzzvm_lload(vm, 9);
    buzzvm_lload(vm, 10);
+   buzzvm_lload(vm, 11);
    /* Retrieve parameters and check their types */
+   buzzobj_t b_confidence_probability = buzzvm_stack_at(vm, 11);
    buzzobj_t b_incremental_solving = buzzvm_stack_at(vm, 10);
    buzzobj_t b_debug = buzzvm_stack_at(vm, 9);
    buzzobj_t b_rotation_noise_std = buzzvm_stack_at(vm, 8);
@@ -586,6 +655,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    bool use_flagged_initialization, is_simulation, debug, incremental_solving;
    int number_of_robots;
    std::string error_file_name;
+   double confidence_probability;
 
    if(b_rotation_noise_std->o.type == BUZZTYPE_FLOAT &&
       b_translation_noise_std->o.type == BUZZTYPE_FLOAT &&
@@ -596,7 +666,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_number_of_robots->o.type == BUZZTYPE_INT &&
       b_error_file_name->o.type == BUZZTYPE_STRING &&
       b_debug->o.type == BUZZTYPE_INT &&
-      b_incremental_solving->o.type == BUZZTYPE_INT) {
+      b_incremental_solving->o.type == BUZZTYPE_INT &&
+      b_confidence_probability->o.type == BUZZTYPE_FLOAT) {
 
       // Fill in variables
       rotation_noise_std = b_rotation_noise_std->f.value;
@@ -609,6 +680,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       error_file_name = b_error_file_name->s.value.str;
       debug = b_debug->i.value;
       incremental_solving = b_incremental_solving->i.value;
+      confidence_probability = b_confidence_probability->f.value;
 
    } else {
       buzzvm_seterror(vm,
@@ -621,7 +693,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(incremental_solving, debug,
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(confidence_probability, incremental_solving, debug,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,
@@ -842,6 +914,14 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "neighbor_state", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzNeighborState));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_current_pose_estimate", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateCurrentPoseEstimate));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_pose_estimate_from_neighbor", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdatePoseEstimateFromNeighbor));
    buzzvm_gstore(m_tBuzzVM);
 
    return m_tBuzzVM->state;

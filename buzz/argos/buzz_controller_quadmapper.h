@@ -14,6 +14,7 @@
 #include <random>
 #include <cmath>
 #include <distributed_mapper/distributed_mapper.h>
+#include <distributed_pcm/distributed_pcm.h>
 
 using namespace argos;
 
@@ -66,7 +67,7 @@ public:
 
    virtual void Init(TConfigurationNode& t_node);
 
-   void LoadParameters( const bool& incremental_solving, const bool& debug,
+   void LoadParameters( const double& confidence_probability, const bool& incremental_solving, const bool& debug,
                         const float& rotation_noise_std, const float& translation_noise_std,
                         const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                         const bool& use_flagged_initialization, const bool& is_simulation,
@@ -88,7 +89,7 @@ public:
                                     const double& q_z,
                                     const double& q_w  );
 
-   // Wrapper function related to distributed_mapper
+   // Functions related to distributed_mapper
    void InitOptimizer(const int& period);
 
    void AddNeighborWithinCommunicationRange(const int& rid);
@@ -120,6 +121,10 @@ public:
    void CheckIfAllEstimationDoneAndReset();
 
    void NeighborState(const int& rid, const OptimizerState& state);
+
+   void UpdateCurrentPoseEstimate(const int& pose_id);
+
+   void UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id, const gtsam::Pose3& pose);
 
 protected:
 
@@ -219,6 +224,8 @@ protected:
 
    gtsam::NonlinearFactorGraph local_pose_graph_before_optimization_;
 
+   std::map<int, std::map<gtsam::Key, gtsam::Pose3>> pose_estimates_from_neighbors_;
+
    // Parameters
    double rotation_noise_std_, translation_noise_std_;
 
@@ -235,6 +242,9 @@ protected:
    int end_delay_;
 
    bool incremental_solving_;
+
+   // Pairwise consistency maximization parameters
+   double confidence_probability_;
 
    // Parameter for evaluation
    int number_of_robots_;
