@@ -62,6 +62,12 @@ target_link_libraries(argos3plugin_simulator_buzz_slam
   buzz
   gtsam
   distributed_mapper
+  distributed_pcm
+  global_map_solver
+  fast_max-clique_finder
+  pairwise_consistency
+  robot_measurements
+  graph_utils
   )
 
 set_target_properties(argos3plugin_simulator_buzz_slam PROPERTIES LINKER_LANGUAGE CXX)

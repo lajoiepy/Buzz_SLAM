@@ -438,9 +438,10 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
       for (const auto& estimate_pair : pose_estimates_from_neighbors_.at(robot)) {
          other_robot_poses.insert(estimate_pair.first, estimate_pair.second);
       }      
+      bool use_covariance = false;
       int max_clique_size = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
                               graph_and_values_, other_robot_poses,
-                              confidence_probability_, false);
+                              confidence_probability_, use_covariance);
       total_max_clique_size += max_clique_size;
    }
 
