@@ -142,12 +142,20 @@ void CBuzzControllerQuadMapper::SetNextPosition(const CVector3& translation) {
 /****************************************/
 /****************************************/
 
+bool CBuzzControllerQuadMapper::StartOptimizationCondition() {
+   bool periodic_optimization = (number_of_poses_ - number_of_poses_at_optimization_end_) % optimizer_period_ == 0;
+   return periodic_optimization || neighbor_has_started_optimization_;
+}
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
    number_of_poses_++;
    // Update optimizer state
    switch (optimizer_state_) {
       case Idle :
-         if ((number_of_poses_ - number_of_poses_at_optimization_end_) % optimizer_period_ == 0 || neighbor_has_started_optimization_) {
+         if (StartOptimizationCondition()) {
             optimizer_state_ = OptimizerState::Start;
             current_rotation_iteration_ = 0;
             current_pose_iteration_ = 0;
@@ -159,8 +167,8 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          break;
       case Start :
          std::cout << "Robot " << robot_id_ << " Start Distributed Pose Graph Optimization" << std::endl;
-         StartPoseGraphOptimization();
          optimizer_state_ = OptimizerState::RotationEstimation;
+         StartPoseGraphOptimization();
          break;
       case RotationEstimation :
          current_rotation_iteration_++;
@@ -316,8 +324,6 @@ void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
    // Factor
    gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_1_symbol, robot_2_symbol, transformation, noise_model_);
    local_pose_graph_->push_back(new_factor);
-
-   // Save other robot pose
 }
 
 /****************************************/
@@ -453,7 +459,15 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
    if (neighboring_robots.size() > 0) {
       disconnected_graph_ = false;
    }
-   
+   bool has_separator_with_neighbor = false;
+   for (const auto& neighbor : neighbors_within_communication_range_) {
+      if (neighboring_robots.find((char)(neighbor+97)) != neighboring_robots.end()) {
+         has_separator_with_neighbor = true;
+      }
+   }
+   if (!has_separator_with_neighbor) {
+      optimizer_state_ = OptimizerState::Idle;
+   }   
 }
 
 /****************************************/

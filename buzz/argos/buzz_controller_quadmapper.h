@@ -156,6 +156,8 @@ protected:
    // Wrapper function related to distributed_mapper
    void IncrementNumberOfPosesAndUpdateState();
 
+   bool StartOptimizationCondition();
+
    void StartPoseGraphOptimization();
 
    void UpdateOptimizer();
@@ -185,7 +187,7 @@ protected:
    virtual bool CompareCentralizedAndDecentralizedError();
 
    void UpdateOptimizerPhase();
-   
+
 protected:
    // General attributes of the controller
    uint16_t robot_id_;
