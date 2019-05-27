@@ -2,7 +2,6 @@
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
-#include <iostream>
 #include <fstream>
 #include <stdio.h>
 
@@ -37,6 +36,8 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    current_pose_iteration_ = 0;
    is_estimation_done_ = false;
    end_delay_ = 0;
+   total_outliers_rejected_ = 0;
+   number_of_poses_at_optimization_end_ = 0;
 
    // Isotropic noise models
    Eigen::VectorXd sigmas(6);
@@ -53,6 +54,9 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    std::remove(log_file_name.c_str());
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
    std::remove(log_file_name.c_str());
+   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_outliers_rejected.g2o";
+   std::remove(log_file_name.c_str());
+
 
 }
 
@@ -142,7 +146,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
    // Update optimizer state
    switch (optimizer_state_) {
       case Idle :
-         if (number_of_poses_ % optimizer_period_ == 0) {
+         if ((number_of_poses_ - number_of_poses_at_optimization_end_) % optimizer_period_ == 0) {
             optimizer_state_ = OptimizerState::Start;
             current_rotation_iteration_ = 0;
             current_pose_iteration_ = 0;
@@ -190,6 +194,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          }
          std::cout << "Robot " << robot_id_ << " End Distributed Pose Graph Optimization" << std::endl;
          optimizer_state_ = OptimizerState::PostEndingCommunicationDelay;
+         number_of_poses_at_optimization_end_ = number_of_poses_;
          break;
       case PostEndingCommunicationDelay :
          optimizer_state_ = OptimizerState::Idle;
@@ -320,6 +325,11 @@ void CBuzzControllerQuadMapper::WriteCurrentDataset() {
 void CBuzzControllerQuadMapper::WriteOptimizedDataset() {
    std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
+   std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_outliers_rejected.g2o";
+   std::ofstream outliers_rejected_file;
+   outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
+   outliers_rejected_file << total_outliers_rejected_ << "\n" ;
+   outliers_rejected_file.close();
 }
 
 /****************************************/
@@ -451,14 +461,16 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
             other_robot_poses.insert(estimate_pair.first, estimate_pair.second);
          }      
          bool use_covariance = false;
-         int max_clique_size = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
+         auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
                                  graph_and_values_, other_robot_poses,
                                  confidence_probability_, use_covariance);
-         total_max_clique_size += max_clique_size;
+         total_max_clique_size += max_clique_info.first;
+         total_outliers_rejected_ += max_clique_info.second;
       }
 
       if (debug_) {
-         std::cout << "Robot " << robot_id_ << " Outliers filtering, total max clique size=" << total_max_clique_size << std::endl;
+         std::cout << "Robot " << robot_id_ << " Outliers filtering, total max clique size=" << total_max_clique_size 
+                   << ", number of outliers rejected=" << total_outliers_rejected_ << std::endl;
       }
    }
 

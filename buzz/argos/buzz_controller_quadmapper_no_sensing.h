@@ -49,6 +49,8 @@ protected:
 
    virtual bool CompareCentralizedAndDecentralizedError();
 
+   virtual void WriteOptimizedDataset();
+
 private:
 
    // Ground truth information to compute fake measurements
@@ -66,6 +68,7 @@ private:
    // Current state of the simulation
    int simulation_step_;
    int number_of_outliers_added_;
+   int number_of_inliers_added_;
    double outlier_probability_;
    double sensor_range_;
 

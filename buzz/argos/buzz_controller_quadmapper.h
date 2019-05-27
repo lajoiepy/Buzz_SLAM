@@ -149,7 +149,7 @@ protected:
 
    void WriteInitialDataset();
 
-   void WriteOptimizedDataset();
+   virtual void WriteOptimizedDataset();
 
    // Wrapper function related to distributed_mapper
    void IncrementNumberOfPosesAndUpdateState();
@@ -202,6 +202,8 @@ protected:
 
    int number_of_poses_;
 
+   int number_of_poses_at_optimization_end_;
+
    std::set<unsigned char> known_other_robots_;
 
    std::vector<int> neighbors_within_communication_range_;
@@ -228,6 +230,8 @@ protected:
    gtsam::NonlinearFactorGraph local_pose_graph_before_optimization_;
 
    std::map<int, std::map<gtsam::Key, gtsam::Pose3>> pose_estimates_from_neighbors_;
+
+   int total_outliers_rejected_;
 
    // Parameters
    double rotation_noise_std_, translation_noise_std_;
