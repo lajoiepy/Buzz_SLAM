@@ -185,7 +185,7 @@ protected:
    virtual bool CompareCentralizedAndDecentralizedError();
 
    void UpdateOptimizerPhase();
-
+   
 protected:
    // General attributes of the controller
    uint16_t robot_id_;

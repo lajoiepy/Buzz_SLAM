@@ -54,12 +54,14 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
          "\tRotationNoiseStd\tTranslationNoiseStd\tRotationChangeThreshold\tPoseChangeThreshold"
          "\tOptimizerPeriod\tChiSquaredProbability"
          "\tErrorCentralized\tErrorDecentralized\tErrorInitial\tNumberOfRotationIterations\tNumberOfPoseIterations"
-         "\tNumberOfInliersAdded\tNumberOfOutliersAdded\tNumberOfOutliersRejected\n";
+         "\tNumberOfInliersAdded\tNumberOfOutliersAdded\tNumberOfSeparatorsRejected\tNumberOfOutliersNotRejected\n";
       error_file.close();
    }
    std::string log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_outliers_added.g2o";
    std::remove(log_file_name.c_str());
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_inliers_added.g2o";
+   std::remove(log_file_name.c_str());
+   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_outliers_added_keys.g2o";
    std::remove(log_file_name.c_str());
 }
 
@@ -256,6 +258,10 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
                                              measurement.rotation().quaternion()[2],
                                              measurement.rotation().quaternion()[3],
                                              measurement.rotation().quaternion()[0] );
+
+      if (is_outlier) {
+         outliers_keys_.insert(std::make_pair(this_robot_symbol.key(), other_robot_symbol.key()));
+      }
    } else {      
       measurement = measurement.inverse();
       new_factor = gtsam::BetweenFactor<gtsam::Pose3>(other_robot_symbol, this_robot_symbol, measurement, noise_model_);
@@ -271,6 +277,10 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
                                              measurement.rotation().quaternion()[2],
                                              measurement.rotation().quaternion()[3],
                                              measurement.rotation().quaternion()[0] );
+
+      if (is_outlier) {
+         outliers_keys_.insert(std::make_pair(other_robot_symbol.key(), this_robot_symbol.key()));
+      }
    }   
 
    // Add new factor to local pose graph
@@ -312,6 +322,33 @@ void CBuzzControllerQuadMapperNoSensing::WriteOptimizedDataset() {
    inliers_added_file.open(inliers_added_file_name, std::ios::trunc);
    inliers_added_file << number_of_inliers_added_ << "\n" ;
    inliers_added_file.close();
+
+   std::string outliers_keys_file_name = "log/datasets/" + std::to_string(robot_id_) + "_outliers_added_keys.g2o";
+   std::ofstream outliers_keys_file;
+   outliers_keys_file.open(outliers_keys_file_name, std::ios::trunc);
+   for (const auto& keys : outliers_keys_) {
+      outliers_keys_file << keys.first << " " << keys.second << "\n" ;
+   }
+   outliers_keys_file.close();
+}
+
+/****************************************/
+/****************************************/
+
+std::set<std::pair<gtsam::Key, gtsam::Key>> CBuzzControllerQuadMapperNoSensing::AggregateOutliersKeys() {
+   std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys;
+   for (size_t i = 0; i < number_of_robots_; i++) {
+      std::string outliers_keys_file_name = "log/datasets/" + std::to_string(i) + "_outliers_added_keys.g2o";
+      std::ifstream outliers_keys_file(outliers_keys_file_name);
+      long unsigned int key1, key2;
+      while (outliers_keys_file >> key1)
+      {
+         outliers_keys_file >> key2;
+         outliers_keys.insert(std::make_pair(gtsam::Key(key1), gtsam::Key(key2)));
+      }
+      outliers_keys_file.close();
+   }
+   return outliers_keys;
 }
 
 /****************************************/
@@ -324,9 +361,11 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
    int expected_size = local_graph_and_values.second->size();
 
    // Aggregate estimates from all the robots
+   auto aggregated_outliers_keys = AggregateOutliersKeys();
    gtsam::Values distributed;
    std::vector<gtsam::GraphAndValues> graph_and_values_vec;
    int number_of_separators = 0;
+   int number_of_outliers_not_rejected = 0;
    for (size_t i = 0; i < number_of_robots_; i++) {
       std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_optimized.g2o";
       if (!boost::filesystem::exists(dataset_file_name)) {
@@ -347,7 +386,10 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
          auto robot_1_id = gtsam::Symbol(pose3_between->key1()).chr();
          auto robot_2_id = gtsam::Symbol(pose3_between->key2()).chr();
          if (robot_1_id != robot_2_id) {
-            number_of_separators ++;
+            number_of_separators++;
+            if (aggregated_outliers_keys.find(std::make_pair(pose3_between->key1(), pose3_between->key2())) != aggregated_outliers_keys.end()) {
+               number_of_outliers_not_rejected++;
+            }
          }
       }
       dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial.g2o";
@@ -368,7 +410,7 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
    // Gather info on outliers
    int total_number_of_outliers_added_on_all_robots = 0;
    int total_number_of_inliers_added_on_all_robots = 0;
-   double total_number_of_outliers_rejected_on_all_robots = 0;
+   double total_number_of_separators_rejected_on_all_robots = 0;
    for (size_t i = 0; i < number_of_robots_; i++) {
       std::string inliers_added_file_name = "log/datasets/" + std::to_string(i) + "_number_of_inliers_added.g2o";
       std::ifstream inliers_added_file(inliers_added_file_name);
@@ -384,14 +426,21 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
       total_number_of_outliers_added_on_all_robots += number_of_outliers_added;
       outliers_added_file.close();
 
+      std::string separators_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_separators_rejected.g2o";
+      std::ifstream separators_rejected_file(separators_rejected_file_name);
+      int number_of_separators_rejected  = 0;
+      separators_rejected_file >> number_of_separators_rejected;
+      total_number_of_separators_rejected_on_all_robots += number_of_separators_rejected;
+      separators_rejected_file.close();
+
       std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_outliers_rejected.g2o";
       std::ifstream outliers_rejected_file(outliers_rejected_file_name);
       int number_of_outliers_rejected  = 0;
       outliers_rejected_file >> number_of_outliers_rejected;
-      total_number_of_outliers_rejected_on_all_robots += number_of_outliers_rejected;
+      total_number_of_separators_rejected_on_all_robots += number_of_outliers_rejected;
       outliers_rejected_file.close();
    }
-   total_number_of_outliers_rejected_on_all_robots /= number_of_robots_;
+   total_number_of_separators_rejected_on_all_robots /= number_of_robots_;
 
    // Write results to csv
    std::ofstream error_file;
@@ -404,7 +453,10 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
             << "\t" << std::get<0>(errors) << "\t" << std::get<1>(errors) << "\t" << std::get<2>(errors) 
             << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ 
             << "\t" << total_number_of_inliers_added_on_all_robots
-            << "\t" << total_number_of_outliers_added_on_all_robots << "\t" << total_number_of_outliers_rejected_on_all_robots << "\n";
+            << "\t" << total_number_of_outliers_added_on_all_robots 
+            << "\t" << total_number_of_separators_rejected_on_all_robots 
+            << "\t" << number_of_outliers_not_rejected
+            << "\n";
    error_file.close();
 
    return std::abs(std::get<0>(errors) - std::get<1>(errors)) < 0.1;

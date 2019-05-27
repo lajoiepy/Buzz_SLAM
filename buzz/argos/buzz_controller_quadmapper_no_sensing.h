@@ -51,6 +51,8 @@ protected:
 
    virtual void WriteOptimizedDataset();
 
+   std::set<std::pair<gtsam::Key, gtsam::Key>> AggregateOutliersKeys();
+
 private:
 
    // Ground truth information to compute fake measurements
@@ -71,6 +73,7 @@ private:
    int number_of_inliers_added_;
    double outlier_probability_;
    double sensor_range_;
+   std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys_;
 
 };
 }
