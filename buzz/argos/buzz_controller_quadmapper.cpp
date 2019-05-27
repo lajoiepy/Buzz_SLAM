@@ -38,6 +38,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    end_delay_ = 0;
    total_outliers_rejected_ = 0;
    number_of_poses_at_optimization_end_ = 0;
+   neighbor_has_started_optimization_ = false;
 
    // Isotropic noise models
    Eigen::VectorXd sigmas(6);
@@ -146,7 +147,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
    // Update optimizer state
    switch (optimizer_state_) {
       case Idle :
-         if ((number_of_poses_ - number_of_poses_at_optimization_end_) % optimizer_period_ == 0) {
+         if ((number_of_poses_ - number_of_poses_at_optimization_end_) % optimizer_period_ == 0 || neighbor_has_started_optimization_) {
             optimizer_state_ = OptimizerState::Start;
             current_rotation_iteration_ = 0;
             current_pose_iteration_ = 0;
@@ -195,6 +196,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          std::cout << "Robot " << robot_id_ << " End Distributed Pose Graph Optimization" << std::endl;
          optimizer_state_ = OptimizerState::PostEndingCommunicationDelay;
          number_of_poses_at_optimization_end_ = number_of_poses_;
+         neighbor_has_started_optimization_ = false;
          break;
       case PostEndingCommunicationDelay :
          optimizer_state_ = OptimizerState::Idle;
@@ -211,6 +213,13 @@ void CBuzzControllerQuadMapper::NeighborState(const int& rid, const OptimizerSta
    } else {
       neighbors_state_.insert(std::make_pair(rid, state));
    }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::UpdateNeighborHasStartedOptimizationFlag(const bool& neighbor_has_started_optimization) {
+   neighbor_has_started_optimization_ = neighbor_has_started_optimization;
 }
 
 /****************************************/

@@ -127,6 +127,8 @@ public:
 
    void UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id, const gtsam::Pose3& pose);
 
+   void UpdateNeighborHasStartedOptimizationFlag(const bool& neighbor_has_started_optimization);
+
 protected:
 
    // Functions for link with buzz VM
@@ -232,6 +234,8 @@ protected:
    std::map<int, std::map<gtsam::Key, gtsam::Pose3>> pose_estimates_from_neighbors_;
 
    int total_outliers_rejected_;
+
+   bool neighbor_has_started_optimization_;
 
    // Parameters
    double rotation_noise_std_, translation_noise_std_;
