@@ -389,12 +389,6 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
    // Load subgraphs
    optimizer_->loadSubgraphAndCreateSubgraphEdge(graph_and_values_);
 
-   // Add prior to the first robot
-   if (robot_id_ == 0) {
-      gtsam::Key first_key = gtsam::KeyVector(poses_initial_guess_->keys()).at(0);
-      optimizer_->addPrior(first_key, poses_initial_guess_->at<gtsam::Pose3>(first_key), noise_model_);
-   }
-
    // Verbosity level
    optimizer_->setVerbosity(distributed_mapper::DistributedMapper::ERROR);
 
@@ -453,7 +447,13 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
    optimizer_->loadSubgraphAndCreateSubgraphEdge(graph_and_values_);
 
    // Add prior to the first robot
-   if (robot_id_ == 0) {
+   bool has_smallest_id = true;
+   for (const auto& neighbor : neighbors_within_communication_range_) {
+      if (neighbor < robot_id_) {
+         has_smallest_id = false;
+      }
+   }
+   if (has_smallest_id) {
       gtsam::Key first_key = gtsam::KeyVector(poses_initial_guess_->keys()).at(0);
       optimizer_->addPrior(first_key, poses_initial_guess_->at<gtsam::Pose3>(first_key), noise_model_);
    }
@@ -924,6 +924,7 @@ void CBuzzControllerQuadMapper::EndOptimization() {
       }
    }
    WriteOptimizedDataset();
+   optimizer_->removePrior();
 }
 
 /****************************************/
