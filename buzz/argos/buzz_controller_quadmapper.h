@@ -239,6 +239,8 @@ protected:
 
    bool neighbor_has_started_optimization_;
 
+   int previous_neighbor_id_in_optimization_order_;
+
    // Parameters
    double rotation_noise_std_, translation_noise_std_;
 

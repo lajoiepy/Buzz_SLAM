@@ -39,6 +39,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    total_outliers_rejected_ = 0;
    number_of_poses_at_optimization_end_ = 0;
    neighbor_has_started_optimization_ = false;
+   previous_neighbor_id_in_optimization_order_ = robot_id_;
 
    // Isotropic noise models
    Eigen::VectorXd sigmas(6);
@@ -163,6 +164,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             neighbors_rotation_estimation_phase_is_finished_.clear();
             neighbors_pose_estimation_phase_is_finished_.clear();
             neighbors_is_estimation_done_.clear();
+            previous_neighbor_id_in_optimization_order_ = robot_id_;
          }
          break;
       case Start :
@@ -242,8 +244,8 @@ OptimizerPhase CBuzzControllerQuadMapper::GetOptimizerPhase() {
    }
    // Smallest ID not done -> estimation
    bool smallest_id_not_done = true;
-   if (robot_id_ > 0) {
-      auto previous_neighbor_done = neighbors_is_estimation_done_[robot_id_-1];
+   if (robot_id_ > 0 && previous_neighbor_id_in_optimization_order_ != robot_id_) {
+      auto previous_neighbor_done = neighbors_is_estimation_done_[previous_neighbor_id_in_optimization_order_];
       if (!previous_neighbor_done) {
          smallest_id_not_done = false;
       }
@@ -544,6 +546,11 @@ void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& r
    neighbors_rotation_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
    neighbors_pose_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
    neighbors_is_estimation_done_.insert(std::make_pair(rid, false));
+   if (previous_neighbor_id_in_optimization_order_ == robot_id_ && rid < robot_id_) {
+      previous_neighbor_id_in_optimization_order_ = rid;
+   } else if (previous_neighbor_id_in_optimization_order_ < rid && rid < robot_id_) {
+      previous_neighbor_id_in_optimization_order_ = rid;
+   }
 }
 
 /****************************************/
@@ -566,7 +573,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
    buzzobj_t b_rotation_estimates = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
 
    // for each loop closure
-   //  Key, linearized rotation, is init
+   // share Key, linearized rotation, is init
    int table_size = 0;
    for (const std::pair<gtsam::Symbol, gtsam::Symbol>& separator_symbols: optimizer_->separatorsSymbols()) {
 
@@ -628,7 +635,8 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
                optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
             }
          }
-         if (optimizer_state_ == OptimizerState::RotationEstimation) {
+         if (optimizer_state_ == OptimizerState::RotationEstimation &&
+            std::find(neighbors_within_communication_range_.begin(), neighbors_within_communication_range_.end(), rotation_estimate.sender_robot_id) != neighbors_within_communication_range_.end()) {
             neighbors_is_estimation_done_[rotation_estimate.sender_robot_id] = rotation_estimate.sender_estimation_is_done;
          }
       }
@@ -795,7 +803,8 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
                optimizer_->updateNeighboringRobotInitialized(symbol.chr(), pose_estimate.sender_robot_is_initialized); // Used only with flagged initialization
             }
          }
-         if (optimizer_state_ == OptimizerState::PoseEstimation) {
+         if (optimizer_state_ == OptimizerState::PoseEstimation &&
+            std::find(neighbors_within_communication_range_.begin(), neighbors_within_communication_range_.end(), pose_estimate.sender_robot_id) != neighbors_within_communication_range_.end()) {
             neighbors_is_estimation_done_[pose_estimate.sender_robot_id] = pose_estimate.sender_estimation_is_done;
          }
       }
@@ -855,10 +864,12 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
 bool CBuzzControllerQuadMapper::PoseEstimationStoppingBarrier() {
    bool all_other_finished_pose_estimation = true;
    for (const auto& neighbor : neighbors_within_communication_range_) {
-      all_other_finished_pose_estimation &= (neighbors_state_[neighbor] != OptimizerState::PoseEstimation) &&
-                                            (neighbors_state_[neighbor] != OptimizerState::PoseEstimationInitialization) &&
-                                            (neighbors_state_[neighbor] != OptimizerState::RotationEstimation);
+      bool other_robot_finished = (neighbors_state_[neighbor] != OptimizerState::PoseEstimation) &&
+                                  (neighbors_state_[neighbor] != OptimizerState::PoseEstimationInitialization) &&
+                                  (neighbors_state_[neighbor] != OptimizerState::RotationEstimation);
+      all_other_finished_pose_estimation &= other_robot_finished;
    } 
+
    if (all_other_finished_pose_estimation) { 
       // If others have finished the pose estimation, this robot should too. 
       return true;
