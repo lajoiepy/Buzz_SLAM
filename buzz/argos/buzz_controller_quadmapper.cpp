@@ -283,7 +283,9 @@ void CBuzzControllerQuadMapper::CheckIfAllEstimationDoneAndReset() {
 bool CBuzzControllerQuadMapper::AllRobotsAreInitialized() {
    bool all_robots_initialized = optimizer_->isRobotInitialized();
    for (const auto& is_robot_initialized : optimizer_->getNeighboringRobotsInit()) {
-      all_robots_initialized &= is_robot_initialized.second;
+      if (std::find(neighbors_within_communication_range_.begin(), neighbors_within_communication_range_.end(), ((int)is_robot_initialized.first-97)) != neighbors_within_communication_range_.end()) {
+         all_robots_initialized &= is_robot_initialized.second;
+      }
    }
    return all_robots_initialized;
 }
