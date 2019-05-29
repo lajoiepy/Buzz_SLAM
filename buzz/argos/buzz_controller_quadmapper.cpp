@@ -67,7 +67,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::LoadParameters( const bool& use_pcm,
+void CBuzzControllerQuadMapper::LoadParameters( const int& number_of_steps_before_failsafe, const bool& use_pcm,
                                                 const double& confidence_probability, const bool& incremental_solving, const bool& debug,
                                                 const float& rotation_noise_std, const float& translation_noise_std,
                                                 const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
@@ -86,6 +86,7 @@ void CBuzzControllerQuadMapper::LoadParameters( const bool& use_pcm,
    incremental_solving_ = incremental_solving;
    confidence_probability_ = confidence_probability;
    use_pcm_ = use_pcm;
+   number_of_steps_before_failsafe_ = number_of_steps_before_failsafe;
 }
 
 /****************************************/
@@ -167,6 +168,23 @@ bool CBuzzControllerQuadMapper::StartOptimizationCondition() {
 /****************************************/
 /****************************************/
 
+void CBuzzControllerQuadMapper::FailSafeCheck() {
+   if (latest_change_ == optimizer_->latestChange()) {
+      number_of_steps_without_changes_++;
+   } else {
+      number_of_steps_without_changes_ = 0;
+      latest_change_ = optimizer_->latestChange();
+   }
+
+   if (number_of_steps_without_changes_ > number_of_steps_before_failsafe_){
+      std::cout << "Robot " << robot_id_ << " Failsafe!" << std::endl;
+      optimizer_state_ = OptimizerState::Idle;
+   }
+}
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
    number_of_poses_++;
    // Update optimizer state
@@ -181,6 +199,12 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             neighbors_pose_estimation_phase_is_finished_.clear();
             neighbors_is_estimation_done_.clear();
             previous_neighbor_id_in_optimization_order_ = robot_id_;
+            latest_change_ = -1;
+            number_of_steps_without_changes_ = 0;
+            if (is_prior_added_) {
+               optimizer_->removePrior();
+               is_prior_added_ = false;
+            }
          }
          break;
       case Start :
@@ -199,9 +223,10 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             // Reinitialize neighbors states information
             SetRotationEstimationIsFinishedFlagsToFalse();
          }
-         if (current_rotation_iteration_ > 20) {
+         if (current_rotation_iteration_ > number_of_steps_before_failsafe_) {
             RemoveInactiveNeighbors();
          }
+         FailSafeCheck();         
          break;
       case PoseEstimationInitialization :
          InitializePoseEstimation();
@@ -217,6 +242,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             // Reinitialize neighbors states information
             SetPoseEstimationIsFinishedFlagsToFalse();
          }
+         FailSafeCheck();
          break;
       case End :
          EndOptimization();
@@ -959,10 +985,6 @@ void CBuzzControllerQuadMapper::EndOptimization() {
       }
    }
    WriteOptimizedDataset();
-   if (is_prior_added_) {
-      optimizer_->removePrior();
-      is_prior_added_ = false;
-   }
 }
 
 /****************************************/

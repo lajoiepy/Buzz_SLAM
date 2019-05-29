@@ -659,7 +659,9 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 10);
    buzzvm_lload(vm, 11);
    buzzvm_lload(vm, 12);
+   buzzvm_lload(vm, 13);
    /* Retrieve parameters and check their types */
+   buzzobj_t b_number_of_steps_before_failsafe = buzzvm_stack_at(vm, 13);
    buzzobj_t b_use_pcm = buzzvm_stack_at(vm, 12);
    buzzobj_t b_confidence_probability = buzzvm_stack_at(vm, 11);
    buzzobj_t b_incremental_solving = buzzvm_stack_at(vm, 10);
@@ -679,6 +681,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    std::string error_file_name;
    double confidence_probability;
    bool use_pcm;
+   int number_of_steps_before_failsafe;
 
    if(b_rotation_noise_std->o.type == BUZZTYPE_FLOAT &&
       b_translation_noise_std->o.type == BUZZTYPE_FLOAT &&
@@ -691,7 +694,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_debug->o.type == BUZZTYPE_INT &&
       b_incremental_solving->o.type == BUZZTYPE_INT &&
       b_confidence_probability->o.type == BUZZTYPE_FLOAT &&
-      b_use_pcm->o.type == BUZZTYPE_INT) {
+      b_use_pcm->o.type == BUZZTYPE_INT &&
+      b_number_of_steps_before_failsafe->o.type == BUZZTYPE_INT) {
 
       // Fill in variables
       rotation_noise_std = b_rotation_noise_std->f.value;
@@ -706,6 +710,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       incremental_solving = b_incremental_solving->i.value;
       confidence_probability = b_confidence_probability->f.value;
       use_pcm = (bool) b_use_pcm->i.value;
+      number_of_steps_before_failsafe = b_number_of_steps_before_failsafe->i.value;
 
    } else {
       buzzvm_seterror(vm,
@@ -718,7 +723,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(use_pcm, confidence_probability, incremental_solving, debug,
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(number_of_steps_before_failsafe,
+                     use_pcm, confidence_probability, incremental_solving, debug,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,

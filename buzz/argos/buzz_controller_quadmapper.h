@@ -67,7 +67,7 @@ public:
 
    virtual void Init(TConfigurationNode& t_node);
 
-   void LoadParameters( const bool& use_pcm,
+   void LoadParameters( const int& number_of_steps_before_failsafe, const bool& use_pcm,
                         const double& confidence_probability, const bool& incremental_solving, const bool& debug,
                         const float& rotation_noise_std, const float& translation_noise_std,
                         const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
@@ -192,6 +192,8 @@ protected:
 
    void RemoveInactiveNeighbors();
 
+   void FailSafeCheck();
+
 protected:
    // General attributes of the controller
    uint16_t robot_id_;
@@ -246,6 +248,12 @@ protected:
    bool neighbor_has_started_optimization_, has_sent_start_optimization_flag_;
 
    int previous_neighbor_id_in_optimization_order_;
+
+   double latest_change_;
+
+   int number_of_steps_without_changes_;
+
+   int number_of_steps_before_failsafe_;
 
    // Parameters
    double rotation_noise_std_, translation_noise_std_;
