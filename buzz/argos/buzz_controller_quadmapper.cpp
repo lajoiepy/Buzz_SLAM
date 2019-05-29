@@ -302,7 +302,9 @@ void CBuzzControllerQuadMapper::CheckIfAllEstimationDoneAndReset() {
    if (is_estimation_done_) {
       bool all_done = true;
       for (const auto& neighbor_done : neighbors_is_estimation_done_) {
-         all_done &= neighbor_done.second;
+         if (neighbors_within_communication_range_.find(neighbor_done.first) != neighbors_within_communication_range_.end()) {
+            all_done &= neighbor_done.second;
+         }
       }
       if (all_done) {
          for (auto& neighbor_done : neighbors_is_estimation_done_) {
