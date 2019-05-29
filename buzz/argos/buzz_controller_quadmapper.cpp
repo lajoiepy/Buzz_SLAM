@@ -42,6 +42,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    has_sent_start_optimization_flag_ = false;
    previous_neighbor_id_in_optimization_order_ = robot_id_;
    is_prior_added_ = false;
+   number_of_optimization_run_ = 0;
 
    // Isotropic noise models
    Eigen::VectorXd sigmas(6);
@@ -406,11 +407,14 @@ void CBuzzControllerQuadMapper::WriteCurrentDataset() {
 void CBuzzControllerQuadMapper::WriteOptimizedDataset() {
    std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
+   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized_" + std::to_string(number_of_optimization_run_) + ".g2o";
+   gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
    std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_outliers_rejected.g2o";
    std::ofstream outliers_rejected_file;
    outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
    outliers_rejected_file << total_outliers_rejected_ << "\n" ;
    outliers_rejected_file.close();
+   number_of_optimization_run_++;
 }
 
 /****************************************/
@@ -418,6 +422,8 @@ void CBuzzControllerQuadMapper::WriteOptimizedDataset() {
 
 void CBuzzControllerQuadMapper::WriteInitialDataset() {
    std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
+   gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
+   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_" + std::to_string(number_of_optimization_run_) + ".g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
 }
 

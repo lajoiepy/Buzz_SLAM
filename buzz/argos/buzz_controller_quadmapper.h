@@ -255,6 +255,8 @@ protected:
 
    int number_of_steps_before_failsafe_;
 
+   int number_of_optimization_run_;
+
    // Parameters
    double rotation_noise_std_, translation_noise_std_;
 
