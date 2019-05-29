@@ -49,6 +49,8 @@ protected:
 
    virtual bool CompareCentralizedAndDecentralizedError();
 
+   virtual void WriteInitialDataset();
+
    virtual void WriteOptimizedDataset();
 
    std::set<std::pair<gtsam::Key, gtsam::Key>> AggregateOutliersKeys(const std::set<int>& robots);
@@ -57,6 +59,7 @@ private:
 
    // Ground truth information to compute fake measurements
    std::map<int, gtsam::Pose3> ground_truth_poses_;
+   boost::shared_ptr<gtsam::Values> ground_truth_data_;
    argos::CCI_PositioningSensor::SReading previous_simulation_gt_pose_;
 
    // Random numbers generation

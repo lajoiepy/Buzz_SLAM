@@ -151,7 +151,7 @@ protected:
    // Utility functions
    void WriteCurrentDataset();
 
-   void WriteInitialDataset();
+   virtual void WriteInitialDataset();
 
    virtual void WriteOptimizedDataset();
 

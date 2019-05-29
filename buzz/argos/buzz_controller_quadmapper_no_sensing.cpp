@@ -43,6 +43,8 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    previous_simulation_gt_pose_ = m_pcPos->GetReading();
 
    // Save ground truth for fake separator creation
+   previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
+   ground_truth_data_ = boost::make_shared< gtsam::Values >();
    SavePoseGroundTruth();
 
    // Initialize log files
@@ -303,6 +305,19 @@ void CBuzzControllerQuadMapperNoSensing::SavePoseGroundTruth(){
 
    gtsam::Pose3 pose_gt(R_gt, t_gt);
    ground_truth_poses_.insert(std::make_pair(number_of_poses_, pose_gt));   
+
+
+   ground_truth_data_->insert(previous_symbol_.key(), pose_gt);
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapperNoSensing::WriteInitialDataset() {
+   CBuzzControllerQuadMapper::WriteInitialDataset();
+   // Write ground truth
+   std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_gt.g2o";
+   gtsam::writeG2o(gtsam::NonlinearFactorGraph(), *ground_truth_data_, dataset_file_name);
 }
 
 /****************************************/
