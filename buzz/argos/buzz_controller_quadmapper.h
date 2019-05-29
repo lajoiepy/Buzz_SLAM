@@ -129,6 +129,8 @@ public:
 
    void UpdateNeighborHasStartedOptimizationFlag(const bool& neighbor_has_started_optimization);
 
+   void UpdateHasSentStartOptimizationFlag(const bool& neighbor_has_started_optimization);
+
 protected:
 
    // Functions for link with buzz VM
@@ -188,6 +190,8 @@ protected:
 
    void UpdateOptimizerPhase();
 
+   void RemoveInactiveNeighbors();
+
 protected:
    // General attributes of the controller
    uint16_t robot_id_;
@@ -210,7 +214,7 @@ protected:
 
    std::set<unsigned char> known_other_robots_;
 
-   std::vector<int> neighbors_within_communication_range_;
+   std::set<int> neighbors_within_communication_range_;
 
    // Distributed mapping attributes
    boost::shared_ptr<distributed_mapper::DistributedMapper> optimizer_;
@@ -235,9 +239,11 @@ protected:
 
    std::map<int, std::map<gtsam::Key, gtsam::Pose3>> pose_estimates_from_neighbors_;
 
+   bool is_prior_added_;
+
    int total_outliers_rejected_;
 
-   bool neighbor_has_started_optimization_;
+   bool neighbor_has_started_optimization_, has_sent_start_optimization_flag_;
 
    int previous_neighbor_id_in_optimization_order_;
 

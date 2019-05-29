@@ -70,6 +70,7 @@ target_link_libraries(argos3plugin_simulator_buzz_slam
   graph_utils
   )
 
+add_compile_options ( -g )
 set_target_properties(argos3plugin_simulator_buzz_slam PROPERTIES LINKER_LANGUAGE CXX)
 
 install(TARGETS argos3plugin_simulator_buzz_slam LIBRARY DESTINATION ${ARGOS_PREFIX}/lib/argos3)

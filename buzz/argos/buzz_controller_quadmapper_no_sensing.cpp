@@ -335,7 +335,7 @@ void CBuzzControllerQuadMapperNoSensing::WriteOptimizedDataset() {
 /****************************************/
 /****************************************/
 
-std::set<std::pair<gtsam::Key, gtsam::Key>> CBuzzControllerQuadMapperNoSensing::AggregateOutliersKeys(const std::vector<int>& robots) {
+std::set<std::pair<gtsam::Key, gtsam::Key>> CBuzzControllerQuadMapperNoSensing::AggregateOutliersKeys(const std::set<int>& robots) {
    std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys;
    for (const auto& i : robots) {
       std::string outliers_keys_file_name = "log/datasets/" + std::to_string(i) + "_outliers_added_keys.g2o";
@@ -356,8 +356,8 @@ std::set<std::pair<gtsam::Key, gtsam::Key>> CBuzzControllerQuadMapperNoSensing::
 
 bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError() {
    // Initialize the set of robots on which to evaluate
-   std::vector<int> robots = neighbors_within_communication_range_;
-   robots.emplace_back(robot_id_);
+   std::set<int> robots = neighbors_within_communication_range_;
+   robots.insert(robot_id_);
 
    // Collect expected estimate size
    std::string local_dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
@@ -392,7 +392,7 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
          auto robot_1_id = gtsam::Symbol(pose3_between->key1()).chr();
          auto robot_2_id = gtsam::Symbol(pose3_between->key2()).chr();
          if (robot_1_id != robot_2_id) {
-            if (std::find(robots.begin(), robots.end(), ((int)robot_1_id-97)) != robots.end() && std::find(robots.begin(), robots.end(), ((int)robot_2_id-97)) != robots.end()) {
+            if (robots.find(((int)robot_1_id-97)) != robots.end() && robots.find(((int)robot_2_id-97)) != robots.end()) {
                number_of_separators++;
                if (aggregated_outliers_keys.find(std::make_pair(pose3_between->key1(), pose3_between->key2())) != aggregated_outliers_keys.end()) {
                   number_of_outliers_not_rejected++;

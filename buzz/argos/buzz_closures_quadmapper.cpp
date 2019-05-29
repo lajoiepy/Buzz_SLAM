@@ -67,7 +67,6 @@ static int BuzzCheckIfAllEstimationDoneAndReset(buzzvm_t vm) {
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->CheckIfAllEstimationDoneAndReset();
 }
 
-
 /****************************************/
 /****************************************/
 
@@ -853,6 +852,15 @@ static int BuzzNeighborState(buzzvm_t vm){
 /****************************************/
 /****************************************/
 
+static int BuzzUpdateHasSentStartOptimizationFlag(buzzvm_t vm) {
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateHasSentStartOptimizationFlag(true);
+}
+
+/****************************************/
+/****************************************/
+
 static int BuzzUpdateNeighborHasStartedOptimizationFlag(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
@@ -959,6 +967,10 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdatePoseEstimateFromNeighbor));
    buzzvm_gstore(m_tBuzzVM);
    
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_has_sent_start_optimization_flag", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateHasSentStartOptimizationFlag));
+   buzzvm_gstore(m_tBuzzVM);
+
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_has_started_optimization_flag", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborHasStartedOptimizationFlag));
    buzzvm_gstore(m_tBuzzVM);

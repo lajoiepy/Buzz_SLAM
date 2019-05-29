@@ -51,7 +51,7 @@ protected:
 
    virtual void WriteOptimizedDataset();
 
-   std::set<std::pair<gtsam::Key, gtsam::Key>> AggregateOutliersKeys(const std::vector<int>& robots);
+   std::set<std::pair<gtsam::Key, gtsam::Key>> AggregateOutliersKeys(const std::set<int>& robots);
 
 private:
 
