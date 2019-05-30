@@ -69,7 +69,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
 /****************************************/
 
 void CBuzzControllerQuadMapper::LoadParameters( const int& number_of_steps_before_failsafe, const bool& use_pcm,
-                                                const double& confidence_probability, const bool& incremental_solving, const bool& debug,
+                                                const double& confidence_probability, const bool& incremental_solving, const int& debug,
                                                 const float& rotation_noise_std, const float& translation_noise_std,
                                                 const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                                                 const bool& use_flagged_initialization, const bool& is_simulation,
@@ -83,7 +83,7 @@ void CBuzzControllerQuadMapper::LoadParameters( const int& number_of_steps_befor
    number_of_robots_ = number_of_robots;
    is_simulation_ = is_simulation;
    error_file_name_ = error_file_name;
-   debug_ = debug;
+   debug_level_ = debug;
    incremental_solving_ = incremental_solving;
    confidence_probability_ = confidence_probability;
    use_pcm_ = use_pcm;
@@ -178,7 +178,9 @@ void CBuzzControllerQuadMapper::FailSafeCheck() {
    }
 
    if (number_of_steps_without_changes_ > number_of_steps_before_failsafe_){
-      std::cout << "Robot " << robot_id_ << " Failsafe!" << std::endl;
+      if (debug_level_ >= 1){
+         std::cout << "Robot " << robot_id_ << " No progress, Stop optimization" << std::endl;
+      }
       optimizer_state_ = OptimizerState::Idle;
    }
 }
@@ -209,7 +211,9 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          }
          break;
       case Start :
-         std::cout << "Robot " << robot_id_ << " Start Distributed Pose Graph Optimization" << std::endl;
+         if (debug_level_ >= 1){
+            std::cout << "Robot " << robot_id_ << " Start Distributed Pose Graph Optimization" << std::endl;
+         }
          optimizer_state_ = OptimizerState::RotationEstimation;
          StartPoseGraphOptimization();
          neighbor_has_started_optimization_ = false;
@@ -251,7 +255,9 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          if (is_simulation_) {
             CompareCentralizedAndDecentralizedError();
          }
-         std::cout << "Robot " << robot_id_ << " End Distributed Pose Graph Optimization" << std::endl;
+         if (debug_level_ >= 1){
+            std::cout << "Robot " << robot_id_ << " End Distributed Pose Graph Optimization" << std::endl;
+         }
          optimizer_state_ = OptimizerState::PostEndingCommunicationDelay;
          number_of_poses_at_optimization_end_ = number_of_poses_;
          break;
@@ -319,7 +325,7 @@ void CBuzzControllerQuadMapper::RemoveInactiveNeighbors() {
 
 OptimizerPhase CBuzzControllerQuadMapper::GetOptimizerPhase() {
    if (is_estimation_done_) {
-      if (debug_) {
+      if (debug_level_ >= 3) {
          std::cout << "Robot " << robot_id_ << " Phase : " << OptimizerPhase::Communication << std::endl;
       }
       return OptimizerPhase::Communication;
@@ -336,7 +342,7 @@ OptimizerPhase CBuzzControllerQuadMapper::GetOptimizerPhase() {
    if (smallest_id_not_done && !neighbors_is_estimation_done_.empty()) {
       phase = OptimizerPhase::Estimation;
    }
-   if (debug_) {
+   if (debug_level_ >= 3) {
       std::cout << "Robot " << robot_id_ << " Phase : " << phase << std::endl;
    }
    return phase;
@@ -587,7 +593,7 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
          total_outliers_rejected_ += max_clique_info.second;
       }
 
-      if (debug_) {
+      if (debug_level_ >= 1) {
          std::cout << "Robot " << robot_id_ << " Outliers filtering, total max clique size=" << total_max_clique_size 
                    << ", number of outliers rejected=" << total_outliers_rejected_ << std::endl;
       }
@@ -701,18 +707,12 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
 
    // Register positioning data table as a global symbol
    Register("rotation_estimates_to_send", b_rotation_estimates);
-   if (debug_) {
-      std::cout << "Robot " << robot_id_ << " Rotation Send" << std::endl;
-   }
 }
 
 /****************************************/
 /****************************************/
 
 void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vector<std::vector<rotation_estimate_t>>& rotation_estimates_from_all_robot) {
-   if (debug_) {
-      std::cout << "Robot " << robot_id_ << " Rotation Receive, State = " << optimizer_state_ << std::endl;
-   }
    for (const auto& rotation_estimates_from_one_robot : rotation_estimates_from_all_robot) {
       for (const auto& rotation_estimate : rotation_estimates_from_one_robot) {
          if (rotation_estimate.receiver_robot_id == robot_id_ &&
@@ -744,11 +744,13 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
          optimizer_->updateRotation();
          optimizer_->updateInitialized(true);
       } catch(const std::exception& ex) {
-         std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
+         if (debug_level_ >= 1) {
+            std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
+         }
          optimizer_state_ = OptimizerState::Idle;
       }
       is_estimation_done_ = true;
-      if (debug_) {
+      if (debug_level_ >= 3) {
          std::cout << "Robot " << robot_id_ << " Rotation estimation" << std::endl;
       }
    }
@@ -761,7 +763,7 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    // Stopping condition
    rotation_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
-   if (debug_) {
+   if (debug_level_ >= 2) {
       std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
    }
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_ && current_rotation_iteration_ != 0) {
@@ -874,18 +876,12 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
 
    // Register positioning data table as global symbol
    Register("pose_estimates_to_send", b_pose_estimates);
-   if (debug_) {
-      std::cout << "Robot " << robot_id_ << " Pose Send" << std::endl;
-   }
 }
 
 /****************************************/
 /****************************************/
 
 void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<std::vector<pose_estimate_t>>& pose_estimates_from_all_robot) {
-   if (debug_) {
-      std::cout << "Robot " << robot_id_ << " Pose Receive, State = " << optimizer_state_ << std::endl;
-   }
    for (const auto& pose_estimates_from_one_robot : pose_estimates_from_all_robot) {
       for (const auto& pose_estimate : pose_estimates_from_one_robot) {
          if (pose_estimate.receiver_robot_id == robot_id_ &&
@@ -915,12 +911,14 @@ void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
       optimizer_->updatePoses();
       optimizer_->updateInitialized(true);
    } catch(const std::exception& ex) {
-      std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
+      if (debug_level_ >= 1) {
+         std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
+      }
       optimizer_state_ = OptimizerState::Idle;
    }
 
    is_estimation_done_ = true;
-   if (debug_) {
+   if (debug_level_ >= 3) {
       std::cout << "Robot " << robot_id_ << " Pose estimation" << std::endl;
    }
 }
@@ -950,7 +948,7 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    // Stopping condition
    pose_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
-   if (debug_) {
+   if (debug_level_ >= 2) {
       std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
    }
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < pose_estimate_change_threshold_ && current_pose_iteration_ != 0) {

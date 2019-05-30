@@ -68,7 +68,7 @@ public:
    virtual void Init(TConfigurationNode& t_node);
 
    void LoadParameters( const int& number_of_steps_before_failsafe, const bool& use_pcm,
-                        const double& confidence_probability, const bool& incremental_solving, const bool& debug,
+                        const double& confidence_probability, const bool& incremental_solving, const int& debug,
                         const float& rotation_noise_std, const float& translation_noise_std,
                         const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                         const bool& use_flagged_initialization, const bool& is_simulation,
@@ -270,7 +270,7 @@ protected:
 
    bool use_flagged_initialization_;
 
-   bool debug_;
+   int debug_level_;
 
    int end_delay_;
 

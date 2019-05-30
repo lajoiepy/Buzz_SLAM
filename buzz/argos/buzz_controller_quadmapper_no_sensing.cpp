@@ -439,7 +439,8 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
                                                       evaluation_model,
                                                       chordal_graph_noise_model_,
                                                       false,
-                                                      distributed );
+                                                      distributed,
+                                                      (bool) debug_level_);
 
    // Gather info on outliers
    int total_number_of_outliers_added_on_all_robots = 0;

@@ -676,8 +676,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzobj_t b_error_file_name = buzzvm_stack_at(vm, 1);
    float rotation_noise_std, translation_noise_std, 
       rotation_estimate_change_threshold, pose_estimate_change_threshold;
-   bool use_flagged_initialization, is_simulation, debug, incremental_solving;
-   int number_of_robots;
+   bool use_flagged_initialization, is_simulation, incremental_solving;
+   int number_of_robots, debug_level;
    std::string error_file_name;
    double confidence_probability;
    bool use_pcm;
@@ -706,7 +706,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       is_simulation = (bool) b_is_simulation->i.value;
       number_of_robots = b_number_of_robots->i.value;
       error_file_name = b_error_file_name->s.value.str;
-      debug = b_debug->i.value;
+      debug_level = b_debug->i.value;
       incremental_solving = b_incremental_solving->i.value;
       confidence_probability = b_confidence_probability->f.value;
       use_pcm = (bool) b_use_pcm->i.value;
@@ -724,7 +724,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_gload(vm);
    /* Call function */
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(number_of_steps_before_failsafe,
-                     use_pcm, confidence_probability, incremental_solving, debug,
+                     use_pcm, confidence_probability, incremental_solving, debug_level,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,
