@@ -275,6 +275,27 @@ void CBuzzControllerQuadMapper::NeighborState(const int& rid, const OptimizerSta
 /****************************************/
 /****************************************/
 
+void CBuzzControllerQuadMapper::RemoveDisconnectedNeighbors() {
+   std::vector<int> neighbors_to_be_removed;
+   for (const auto& neighbor_id : neighbors_within_communication_range_) {
+      if (known_other_robots_.find((char)(neighbor_id+97)) == known_other_robots_.end()) {
+         neighbors_to_be_removed.emplace_back(neighbor_id);
+      }
+   }
+   for (const auto& neighbor_id : neighbors_to_be_removed) {
+      neighbors_within_communication_range_.erase(neighbor_id);;
+      neighbors_rotation_estimation_phase_is_finished_.erase(neighbor_id);
+      neighbors_pose_estimation_phase_is_finished_.erase(neighbor_id);
+      neighbors_is_estimation_done_.erase(neighbor_id);
+   }
+   if (neighbors_within_communication_range_.empty()) {
+      optimizer_state_ = OptimizerState::Idle;
+   }
+}
+
+/****************************************/
+/****************************************/
+
 void CBuzzControllerQuadMapper::RemoveInactiveNeighbors() {
    std::vector<int> neighbors_to_be_removed;
    for (const auto& neighbor_id : neighbors_within_communication_range_) {
@@ -483,11 +504,13 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
 /****************************************/
 
 void CBuzzControllerQuadMapper::StartPoseGraphOptimization() {
+   
+   RemoveDisconnectedNeighbors();
 
    UpdateOptimizer();
 
    OutliersFiltering();
-
+   
    SaveInitialGraph();
 
    optimizer_->updateInitialized(false);
@@ -559,7 +582,7 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
          bool use_covariance = false;
          auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
                                  graph_and_values_, other_robot_poses,
-                                 confidence_probability_, use_covariance);
+                                 confidence_probability_, use_covariance, is_prior_added_);
          total_max_clique_size += max_clique_info.first;
          total_outliers_rejected_ += max_clique_info.second;
       }
@@ -716,9 +739,14 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
 
 void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
    if (optimizer_state_ == OptimizerState::RotationEstimation) {
-      optimizer_->estimateRotation();
-      optimizer_->updateRotation();
-      optimizer_->updateInitialized(true);
+      try {
+         optimizer_->estimateRotation();
+         optimizer_->updateRotation();
+         optimizer_->updateInitialized(true);
+      } catch(const std::exception& ex) {
+         std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
+         optimizer_state_ = OptimizerState::Idle;
+      }
       is_estimation_done_ = true;
       if (debug_) {
          std::cout << "Robot " << robot_id_ << " Rotation estimation" << std::endl;
@@ -882,9 +910,15 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
 /****************************************/
 
 void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
-   optimizer_->estimatePoses();
-   optimizer_->updatePoses();
-   optimizer_->updateInitialized(true);
+   try {
+      optimizer_->estimatePoses();
+      optimizer_->updatePoses();
+      optimizer_->updateInitialized(true);
+   } catch(const std::exception& ex) {
+      std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
+      optimizer_state_ = OptimizerState::Idle;
+   }
+
    is_estimation_done_ = true;
    if (debug_) {
       std::cout << "Robot " << robot_id_ << " Pose estimation" << std::endl;

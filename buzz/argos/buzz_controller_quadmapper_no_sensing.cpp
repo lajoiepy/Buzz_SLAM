@@ -215,6 +215,7 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
    gtsam::Symbol this_robot_symbol = gtsam::Symbol(robot_id_char_, this_robot_pose_id);
    unsigned char other_robot_id_char = (unsigned char)(97 + other_robot_id);
    gtsam::Symbol other_robot_symbol = gtsam::Symbol(other_robot_id_char, other_robot_pose_id);
+   AddNewKnownRobot(other_robot_symbol.chr());
 
    // Get this robot pose
    gtsam::Pose3 this_robot_pose = ground_truth_poses_.find(this_robot_pose_id)->second;

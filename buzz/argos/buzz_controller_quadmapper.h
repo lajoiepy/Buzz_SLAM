@@ -192,6 +192,8 @@ protected:
 
    void RemoveInactiveNeighbors();
 
+   void RemoveDisconnectedNeighbors();
+
    void FailSafeCheck();
 
 protected:
