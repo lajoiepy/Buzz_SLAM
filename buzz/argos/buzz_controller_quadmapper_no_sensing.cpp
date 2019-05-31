@@ -47,6 +47,15 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    ground_truth_data_ = boost::make_shared< gtsam::Values >();
    SavePoseGroundTruth();
 
+   // Initialize covariance matrix
+   covariance_matrix_ = gtsam::Matrix6::Zero();
+   covariance_matrix_(0,0) = std::pow(rotation_noise_std_, 2);
+   covariance_matrix_(1,1) = std::pow(rotation_noise_std_, 2);
+   covariance_matrix_(2,2) = std::pow(rotation_noise_std_, 2);
+   covariance_matrix_(3,3) = std::pow(translation_noise_std_, 2);
+   covariance_matrix_(4,4) = std::pow(translation_noise_std_, 2);
+   covariance_matrix_(5,5) = std::pow(translation_noise_std_, 2);
+
    // Initialize log files
    if (is_simulation_ && robot_id_ ==  0 && !boost::filesystem::exists(error_file_name_)) {
       // Write results to csv
@@ -160,6 +169,9 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement() {
 
    // Add new pose estimate into initial guess
    poses_initial_guess_->insert(current_symbol_.key(), new_pose_);
+
+   // Add transform to local map for pairwise consistency maximization
+   robot_local_map_.addTransform(new_factor, covariance_matrix_);
 
    // Save ground truth for fake separator creation
    SavePoseGroundTruth();
@@ -288,6 +300,9 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(new_factor);
+
+   // Add transform to local map for pairwise consistency maximization
+   robot_local_map_.addTransform(new_factor, covariance_matrix_);
 
    return is_outlier;
 }

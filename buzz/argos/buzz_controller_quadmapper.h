@@ -125,7 +125,7 @@ public:
 
    void UpdateCurrentPoseEstimate(const int& pose_id);
 
-   void UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id, const gtsam::Pose3& pose);
+   void UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id, const graph_utils::PoseWithCovariance& pose);
 
    void UpdateNeighborHasStartedOptimizationFlag(const bool& neighbor_has_started_optimization);
 
@@ -209,6 +209,8 @@ protected:
 
    gtsam::GraphAndValues graph_and_values_;
 
+   robot_measurements::RobotLocalMap robot_local_map_;
+
    // Current state of the controller
    gtsam::Symbol previous_symbol_;
 
@@ -241,7 +243,7 @@ protected:
 
    gtsam::NonlinearFactorGraph local_pose_graph_before_optimization_;
 
-   std::map<int, std::map<gtsam::Key, gtsam::Pose3>> pose_estimates_from_neighbors_;
+   std::map<int, graph_utils::Trajectory> pose_estimates_from_neighbors_;
 
    bool is_prior_added_;
 
@@ -265,6 +267,8 @@ protected:
    gtsam::SharedNoiseModel noise_model_;
 
    gtsam::noiseModel::Isotropic::shared_ptr chordal_graph_noise_model_;
+
+   gtsam::Matrix6 covariance_matrix_;
 
    double rotation_estimate_change_threshold_, pose_estimate_change_threshold_;
 

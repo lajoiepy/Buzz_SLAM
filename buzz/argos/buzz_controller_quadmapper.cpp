@@ -418,6 +418,9 @@ void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
    // Factor
    gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_1_symbol, robot_2_symbol, transformation, noise_model_);
    local_pose_graph_->push_back(new_factor);
+
+   // Add transform to local map for pairwise consistency maximization
+   robot_local_map_.addTransform(new_factor, covariance_matrix_);
 }
 
 /****************************************/
@@ -581,14 +584,9 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
       // Perform pairwise consistency maximization
       int total_max_clique_size = 0;
       for (const auto& robot : neighbors_within_communication_range_) {
-         gtsam::Values other_robot_poses;
-         for (const auto& estimate_pair : pose_estimates_from_neighbors_.at(robot)) {
-            other_robot_poses.insert(estimate_pair.first, estimate_pair.second);
-         }      
-         bool use_covariance = false;
          auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
-                                 graph_and_values_, other_robot_poses,
-                                 confidence_probability_, use_covariance, is_prior_added_);
+                                 graph_and_values_, robot_local_map_, pose_estimates_from_neighbors_.at(robot),
+                                 confidence_probability_, is_prior_added_);
          total_max_clique_size += max_clique_info.first;
          total_outliers_rejected_ += max_clique_info.second;
       }
@@ -606,12 +604,18 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
 
 void CBuzzControllerQuadMapper::UpdateCurrentPoseEstimate(const int& pose_id) {
    buzzobj_t b_pose_estimate = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
-   auto pose = poses_initial_guess_->at<gtsam::Pose3>(gtsam::Symbol(robot_id_char_, pose_id).key());
-   auto pose_matrix = pose.matrix();
+   auto pose_with_covariance = robot_local_map_.getTrajectory().trajectory_poses.at(gtsam::Symbol(robot_id_char_, pose_id).key()).pose;
+   auto pose_matrix = pose_with_covariance.pose.matrix();
    for (int i = 0; i < 4; i++) {
       for (int j = 0; j < 4; j++) {
          double matrix_elem = pose_matrix(i, j);
          TablePut(b_pose_estimate, i*4 + j, matrix_elem);
+      }
+   }
+   for (int i = 0; i < 6; i++) {
+      for (int j = 0; j < 6; j++) {
+         double matrix_elem = pose_with_covariance.covariance_matrix(i, j);
+         TablePut(b_pose_estimate, 16 + i*6 + j, matrix_elem);
       }
    }
    // Register pose estimate data table as a global symbol
@@ -621,18 +625,29 @@ void CBuzzControllerQuadMapper::UpdateCurrentPoseEstimate(const int& pose_id) {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id, const gtsam::Pose3& pose) {
+void CBuzzControllerQuadMapper::UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id, const graph_utils::PoseWithCovariance& pose) {
    auto key = gtsam::Symbol(((char)rid+97), pose_id).key();
+   graph_utils::TrajectoryPose new_pose;
+   new_pose.id = key;
+   new_pose.pose = pose;
    if (pose_estimates_from_neighbors_.find(rid) != pose_estimates_from_neighbors_.end()) {
-      if (pose_estimates_from_neighbors_.at(rid).find(key) != pose_estimates_from_neighbors_.at(rid).end()) {
-         pose_estimates_from_neighbors_.at(rid).at(key) = pose;
+      if (pose_estimates_from_neighbors_.at(rid).trajectory_poses.find(key) != pose_estimates_from_neighbors_.at(rid).trajectory_poses.end()) {
+         pose_estimates_from_neighbors_.at(rid).trajectory_poses.at(key) = new_pose;
       } else {
-         pose_estimates_from_neighbors_.at(rid).insert(std::make_pair(key, pose));
+         pose_estimates_from_neighbors_.at(rid).trajectory_poses.insert(std::make_pair(key, new_pose));
+         if (key < pose_estimates_from_neighbors_.at(rid).start_id) {
+            pose_estimates_from_neighbors_.at(rid).start_id = key;
+         }
+         if (key > pose_estimates_from_neighbors_.at(rid).end_id) {
+            pose_estimates_from_neighbors_.at(rid).end_id = key;
+         }
       }
    } else {
-      std::map<gtsam::Key, gtsam::Pose3> new_map;
-      new_map.insert(std::make_pair(key, pose));
-      pose_estimates_from_neighbors_.insert(std::make_pair(rid, new_map));
+      graph_utils::Trajectory new_trajectory;
+      new_trajectory.trajectory_poses.insert(std::make_pair(key, new_pose));
+      new_trajectory.start_id = key;
+      new_trajectory.end_id = key;
+      pose_estimates_from_neighbors_.insert(std::make_pair(rid, new_trajectory));
    }
 }
 

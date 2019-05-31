@@ -420,7 +420,9 @@ static int BuzzUpdatePoseEstimateFromNeighbor(buzzvm_t vm){
       pose_estimate.emplace_back(estimate_elem);
    }
 
-   gtsam::Matrix4 estimate_matrix;
+   // TODO: Fix this weird initialization issue with Eigen matrix that prevents us to 
+   // do assigments in the previous loop directly.
+   gtsam::Matrix4 estimate_matrix; 
    estimate_matrix(0,0) = pose_estimate.at(0);
    estimate_matrix(0,1) = pose_estimate.at(1);
    estimate_matrix(0,2) = pose_estimate.at(2);
@@ -439,11 +441,53 @@ static int BuzzUpdatePoseEstimateFromNeighbor(buzzvm_t vm){
    estimate_matrix(3,3) = pose_estimate.at(15);
    gtsam::Pose3 pose(estimate_matrix);
 
+   gtsam::Matrix6 covariance_matrix;
+   covariance_matrix(0,0) = pose_estimate.at(16);
+   covariance_matrix(0,1) = pose_estimate.at(17);
+   covariance_matrix(0,2) = pose_estimate.at(18);
+   covariance_matrix(0,3) = pose_estimate.at(19);
+   covariance_matrix(0,4) = pose_estimate.at(20);
+   covariance_matrix(0,5) = pose_estimate.at(21);
+   covariance_matrix(1,0) = pose_estimate.at(22);
+   covariance_matrix(1,1) = pose_estimate.at(23);
+   covariance_matrix(1,2) = pose_estimate.at(24);
+   covariance_matrix(1,3) = pose_estimate.at(25);
+   covariance_matrix(1,4) = pose_estimate.at(26);
+   covariance_matrix(1,5) = pose_estimate.at(27);
+   covariance_matrix(2,0) = pose_estimate.at(28);
+   covariance_matrix(2,1) = pose_estimate.at(29);
+   covariance_matrix(2,2) = pose_estimate.at(30);
+   covariance_matrix(2,3) = pose_estimate.at(31);
+   covariance_matrix(2,4) = pose_estimate.at(32);
+   covariance_matrix(2,5) = pose_estimate.at(33);
+   covariance_matrix(3,0) = pose_estimate.at(34);
+   covariance_matrix(3,1) = pose_estimate.at(35);
+   covariance_matrix(3,2) = pose_estimate.at(36);
+   covariance_matrix(3,3) = pose_estimate.at(37);
+   covariance_matrix(3,4) = pose_estimate.at(38);
+   covariance_matrix(3,5) = pose_estimate.at(39);
+   covariance_matrix(4,0) = pose_estimate.at(40);
+   covariance_matrix(4,1) = pose_estimate.at(41);
+   covariance_matrix(4,2) = pose_estimate.at(42);
+   covariance_matrix(4,3) = pose_estimate.at(43);
+   covariance_matrix(4,4) = pose_estimate.at(44);
+   covariance_matrix(4,5) = pose_estimate.at(45);
+   covariance_matrix(5,0) = pose_estimate.at(46);
+   covariance_matrix(5,1) = pose_estimate.at(47);
+   covariance_matrix(5,2) = pose_estimate.at(48);
+   covariance_matrix(5,3) = pose_estimate.at(49);
+   covariance_matrix(5,4) = pose_estimate.at(50);
+   covariance_matrix(5,5) = pose_estimate.at(51);
+
+   graph_utils::PoseWithCovariance pose_with_covariance;
+   pose_with_covariance.pose = pose;
+   pose_with_covariance.covariance_matrix = covariance_matrix;
+
    int rid = b_rid->i.value;
    int pose_id = b_pose_id->i.value;
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdatePoseEstimateFromNeighbor(rid, pose_id, pose);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdatePoseEstimateFromNeighbor(rid, pose_id, pose_with_covariance);
 
    return buzzvm_ret0(vm);
 }
