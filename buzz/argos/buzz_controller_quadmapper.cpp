@@ -582,18 +582,20 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
    
    if (use_pcm_) {
       // Perform pairwise consistency maximization
-      int total_max_clique_size = 0;
+      int number_of_measurements_accepted = 0;
+      int number_of_measurements_rejected = 0;
       for (const auto& robot : neighbors_within_communication_range_) {
          auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
                                  graph_and_values_, robot_local_map_, pose_estimates_from_neighbors_.at(robot),
                                  confidence_probability_, is_prior_added_);
-         total_max_clique_size += max_clique_info.first;
-         total_outliers_rejected_ += max_clique_info.second;
+         number_of_measurements_accepted += max_clique_info.first;
+         number_of_measurements_rejected += max_clique_info.second;
       }
+      total_outliers_rejected_ += number_of_measurements_rejected;
 
       if (debug_level_ >= 1) {
-         std::cout << "Robot " << robot_id_ << " Outliers filtering, total max clique size=" << total_max_clique_size 
-                   << ", number of outliers rejected=" << total_outliers_rejected_ << std::endl;
+         std::cout << "Robot " << robot_id_ << " Outliers filtering, max clique size=" << number_of_measurements_accepted 
+                   << ", number of measurements removed=" << number_of_measurements_rejected << std::endl;
       }
    }
 
