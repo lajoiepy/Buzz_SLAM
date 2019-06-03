@@ -272,7 +272,8 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
                                              measurement.rotation().quaternion()[1],
                                              measurement.rotation().quaternion()[2],
                                              measurement.rotation().quaternion()[3],
-                                             measurement.rotation().quaternion()[0] );
+                                             measurement.rotation().quaternion()[0],
+                                             covariance_matrix_ );
 
       if (is_outlier) {
          outliers_keys_.insert(std::make_pair(this_robot_symbol.key(), other_robot_symbol.key()));
@@ -291,7 +292,8 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
                                              measurement.rotation().quaternion()[1],
                                              measurement.rotation().quaternion()[2],
                                              measurement.rotation().quaternion()[3],
-                                             measurement.rotation().quaternion()[0] );
+                                             measurement.rotation().quaternion()[0],
+                                             covariance_matrix_ );
 
       if (is_outlier) {
          outliers_keys_.insert(std::make_pair(other_robot_symbol.key(), this_robot_symbol.key()));

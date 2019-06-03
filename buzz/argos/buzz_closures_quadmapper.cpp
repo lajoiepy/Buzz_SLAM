@@ -586,20 +586,23 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
    buzzvm_lload(vm, 9);
    buzzvm_lload(vm, 10);
    buzzvm_lload(vm, 11);
+   buzzvm_lload(vm, 12);
    /* Retrieve parameters and check their types */
-   buzzobj_t b_robot_1_id = buzzvm_stack_at(vm, 11);
-   buzzobj_t b_robot_2_id = buzzvm_stack_at(vm, 10);
-   buzzobj_t b_robot_1_pose_id = buzzvm_stack_at(vm, 9);
-   buzzobj_t b_robot_2_pose_id = buzzvm_stack_at(vm, 8);
-   buzzobj_t b_x = buzzvm_stack_at(vm, 7);
-   buzzobj_t b_y = buzzvm_stack_at(vm, 6);
-   buzzobj_t b_z = buzzvm_stack_at(vm, 5);
-   buzzobj_t b_q_x = buzzvm_stack_at(vm, 4);
-   buzzobj_t b_q_y = buzzvm_stack_at(vm, 3);
-   buzzobj_t b_q_z = buzzvm_stack_at(vm, 2);
-   buzzobj_t b_q_w = buzzvm_stack_at(vm, 1);
+   buzzobj_t b_robot_1_id = buzzvm_stack_at(vm, 12);
+   buzzobj_t b_robot_2_id = buzzvm_stack_at(vm, 11);
+   buzzobj_t b_robot_1_pose_id = buzzvm_stack_at(vm, 10);
+   buzzobj_t b_robot_2_pose_id = buzzvm_stack_at(vm, 9);
+   buzzobj_t b_x = buzzvm_stack_at(vm, 8);
+   buzzobj_t b_y = buzzvm_stack_at(vm, 7);
+   buzzobj_t b_z = buzzvm_stack_at(vm, 6);
+   buzzobj_t b_q_x = buzzvm_stack_at(vm, 5);
+   buzzobj_t b_q_y = buzzvm_stack_at(vm, 4);
+   buzzobj_t b_q_z = buzzvm_stack_at(vm, 3);
+   buzzobj_t b_q_w = buzzvm_stack_at(vm, 2);
+   buzzobj_t b_covariance_matrix = buzzvm_stack_at(vm, 1);
    int robot_1_id, robot_2_id, robot_1_pose_id, robot_2_pose_id;
    float x, y, z, q_x, q_y, q_z, q_w;
+   std::vector<double> covariance_values;
    if(b_robot_1_id->o.type == BUZZTYPE_INT &&
       b_robot_2_id->o.type == BUZZTYPE_INT &&
       b_robot_1_pose_id->o.type == BUZZTYPE_INT &&
@@ -610,7 +613,8 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
       b_q_x->o.type == BUZZTYPE_FLOAT &&
       b_q_y->o.type == BUZZTYPE_FLOAT &&
       b_q_z->o.type == BUZZTYPE_FLOAT &&
-      b_q_w->o.type == BUZZTYPE_FLOAT) {
+      b_q_w->o.type == BUZZTYPE_FLOAT &&
+      b_covariance_matrix->o.type == BUZZTYPE_TABLE) {
 
       // Fill in variables
       robot_1_id = b_robot_1_id->i.value;
@@ -625,6 +629,19 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
       q_z = b_q_z->f.value;
       q_w = b_q_w->f.value;
 
+      int table_size = buzzdict_size(b_covariance_matrix->t.value);
+      double covariance_elem;
+      for (int32_t i = 0; i < table_size; ++i) {
+         buzzvm_dup(vm);
+         buzzvm_pushi(vm, i);
+         buzzvm_tget(vm);
+         buzzvm_type_assert(vm, 1, BUZZTYPE_FLOAT);
+         buzzobj_t b_covariance_value = buzzvm_stack_at(vm, 1);
+         buzzvm_pop(vm);
+         covariance_elem = b_covariance_value->f.value;
+         covariance_values.emplace_back(covariance_elem);
+      }
+
    } else {
       buzzvm_seterror(vm,
                       BUZZVM_ERROR_TYPE,
@@ -632,14 +649,23 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
          );
       return vm->state;
    }
+
+   gtsam::Matrix6 covariance_matrix;
+   for (int i = 0; i < 6; i++) {
+      for (int j = 0; j < 6; j++) {
+         covariance_matrix(i,j) = covariance_values.at(i*6+j);
+      }
+   }
+
    /* Get pointer to the controller */
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->AddSeparatorToLocalGraph(  robot_1_id, robot_2_id,
-                                                                                                               robot_1_pose_id, robot_2_pose_id,
-                                                                                                               x, y, z,
-                                                                                                               q_x, q_y, q_z, q_w  );
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->AddSeparatorToLocalGraph( robot_1_id, robot_2_id,
+                                                                                                            robot_1_pose_id, robot_2_pose_id,
+                                                                                                            x, y, z,
+                                                                                                            q_x, q_y, q_z, q_w,
+                                                                                                            covariance_matrix );
    return buzzvm_ret0(vm);
 }
 

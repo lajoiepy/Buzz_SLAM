@@ -110,7 +110,8 @@ void CBuzzControllerQuadMapper::UpdateCurrentSeparatorBuzzStructure(  const int&
                                              const double& q_x,
                                              const double& q_y,
                                              const double& q_z,
-                                             const double& q_w  ) {
+                                             const double& q_w,
+                                             const gtsam::Matrix6& covariance_matrix ) {
    // Create empty data table
    buzzobj_t b_separator_measurement = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
    // Store symbol information
@@ -127,6 +128,16 @@ void CBuzzControllerQuadMapper::UpdateCurrentSeparatorBuzzStructure(  const int&
    TablePut(b_separator_measurement, "q_y", q_y);
    TablePut(b_separator_measurement, "q_z", q_z);
    TablePut(b_separator_measurement, "q_w", q_w);
+   // Store covariance matrix
+   buzzobj_t b_covariance_matrix = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+   for (int i = 0; i < 6; i++) {
+      for (int j = 0; j < 6; j++) {
+         double matrix_elem = covariance_matrix(i, j);
+         TablePut(b_covariance_matrix, i*6 + j, matrix_elem);
+      }
+   }
+   TablePut(b_separator_measurement, "covariance_matrix", b_covariance_matrix);
+
    // Register positioning data table as global symbol
    Register("current_separator_measurement", b_separator_measurement);
 
@@ -395,7 +406,8 @@ void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
                                  const double& q_x,
                                  const double& q_y,
                                  const double& q_z,
-                                 const double& q_w  ) {
+                                 const double& q_w,
+                                 const gtsam::Matrix6& covariance_matrix ) {
 
    // Separator symbols
    unsigned char robot_1_id_char = (unsigned char)(97 + robot_1_id);
@@ -420,7 +432,7 @@ void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
    local_pose_graph_->push_back(new_factor);
 
    // Add transform to local map for pairwise consistency maximization
-   robot_local_map_.addTransform(new_factor, covariance_matrix_);
+   robot_local_map_.addTransform(new_factor, covariance_matrix);
 }
 
 /****************************************/

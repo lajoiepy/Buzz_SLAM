@@ -88,7 +88,8 @@ public:
                                     const double& q_x,
                                     const double& q_y,
                                     const double& q_z,
-                                    const double& q_w  );
+                                    const double& q_w,
+                                    const gtsam::Matrix6& covariance_matrix );
 
    // Functions related to distributed_mapper
    void InitOptimizer(const int& period);
@@ -134,17 +135,18 @@ public:
 protected:
 
    // Functions for link with buzz VM
-   void UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
-                                                const int& robot_2_id,
-                                                const int& robot_1_pose_id,
-                                                const int& robot_2_pose_id,
-                                                const double& x,
-                                                const double& y,
-                                                const double& z,
-                                                const double& q_x,
-                                                const double& q_y,
-                                                const double& q_z,
-                                                const double& q_w  );
+   void UpdateCurrentSeparatorBuzzStructure( const int& robot_1_id,
+                                             const int& robot_2_id,
+                                             const int& robot_1_pose_id,
+                                             const int& robot_2_pose_id,
+                                             const double& x,
+                                             const double& y,
+                                             const double& z,
+                                             const double& q_x,
+                                             const double& q_y,
+                                             const double& q_z,
+                                             const double& q_w,
+                                             const gtsam::Matrix6& covariance_matrix );
 
    virtual buzzvm_state RegisterFunctions();
 
