@@ -74,6 +74,8 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    std::remove(log_file_name.c_str());
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_outliers_added_keys.g2o";
    std::remove(log_file_name.c_str());
+   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_reference_frame.g2o";
+   std::remove(log_file_name.c_str());
 }
 
 /****************************************/
@@ -363,6 +365,12 @@ void CBuzzControllerQuadMapperNoSensing::WriteOptimizedDataset() {
       outliers_keys_file << keys.first << " " << keys.second << "\n" ;
    }
    outliers_keys_file.close();
+
+   std::string reference_frame_file_name = "log/datasets/" + std::to_string(robot_id_) + "_reference_frame.g2o";
+   std::ofstream reference_frame_file;
+   reference_frame_file.open(reference_frame_file_name, std::ios::trunc);
+   reference_frame_file << lowest_id_included_in_global_map_ << "\n" ;
+   reference_frame_file.close();
 }
 
 /****************************************/
@@ -449,69 +457,74 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
    }
    gtsam::GraphAndValues full_graph_and_values = distributed_mapper::evaluation_utils::readFullGraph(robots.size(), graph_and_values_vec);
 
-   // Compute Error
-   gtsam::noiseModel::Diagonal::shared_ptr evaluation_model = gtsam::noiseModel::Isotropic::Variance(6, 1e-12);
-   auto errors = distributed_mapper::evaluation_utils::evaluateEstimates(robots.size(),
-                                                      full_graph_and_values,
-                                                      evaluation_model,
-                                                      chordal_graph_noise_model_,
-                                                      false,
-                                                      distributed,
-                                                      (bool) debug_level_);
+   try {
+      // Compute Error
+      gtsam::noiseModel::Diagonal::shared_ptr evaluation_model = gtsam::noiseModel::Isotropic::Variance(6, 1e-12);
+      auto errors = distributed_mapper::evaluation_utils::evaluateEstimates(robots.size(),
+                                                         full_graph_and_values,
+                                                         evaluation_model,
+                                                         chordal_graph_noise_model_,
+                                                         false,
+                                                         distributed,
+                                                         (bool) debug_level_);
 
-   // Gather info on outliers
-   int total_number_of_outliers_added_on_all_robots = 0;
-   int total_number_of_inliers_added_on_all_robots = 0;
-   double total_number_of_separators_rejected_on_all_robots = 0;
-   for (const auto& i : robots) {
-      std::string inliers_added_file_name = "log/datasets/" + std::to_string(i) + "_number_of_inliers_added.g2o";
-      std::ifstream inliers_added_file(inliers_added_file_name);
-      int number_of_inliers_added  = 0;
-      inliers_added_file >> number_of_inliers_added;
-      total_number_of_inliers_added_on_all_robots += number_of_inliers_added;
-      inliers_added_file.close();
+      // Gather info on outliers
+      int total_number_of_outliers_added_on_all_robots = 0;
+      int total_number_of_inliers_added_on_all_robots = 0;
+      double total_number_of_separators_rejected_on_all_robots = 0;
+      for (const auto& i : robots) {
+         std::string inliers_added_file_name = "log/datasets/" + std::to_string(i) + "_number_of_inliers_added.g2o";
+         std::ifstream inliers_added_file(inliers_added_file_name);
+         int number_of_inliers_added  = 0;
+         inliers_added_file >> number_of_inliers_added;
+         total_number_of_inliers_added_on_all_robots += number_of_inliers_added;
+         inliers_added_file.close();
 
-      std::string outliers_added_file_name = "log/datasets/" + std::to_string(i) + "_number_of_outliers_added.g2o";
-      std::ifstream outliers_added_file(outliers_added_file_name);
-      int number_of_outliers_added  = 0;
-      outliers_added_file >> number_of_outliers_added;
-      total_number_of_outliers_added_on_all_robots += number_of_outliers_added;
-      outliers_added_file.close();
+         std::string outliers_added_file_name = "log/datasets/" + std::to_string(i) + "_number_of_outliers_added.g2o";
+         std::ifstream outliers_added_file(outliers_added_file_name);
+         int number_of_outliers_added  = 0;
+         outliers_added_file >> number_of_outliers_added;
+         total_number_of_outliers_added_on_all_robots += number_of_outliers_added;
+         outliers_added_file.close();
 
-      std::string separators_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_separators_rejected.g2o";
-      std::ifstream separators_rejected_file(separators_rejected_file_name);
-      int number_of_separators_rejected  = 0;
-      separators_rejected_file >> number_of_separators_rejected;
-      total_number_of_separators_rejected_on_all_robots += number_of_separators_rejected;
-      separators_rejected_file.close();
+         std::string separators_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_separators_rejected.g2o";
+         std::ifstream separators_rejected_file(separators_rejected_file_name);
+         int number_of_separators_rejected  = 0;
+         separators_rejected_file >> number_of_separators_rejected;
+         total_number_of_separators_rejected_on_all_robots += number_of_separators_rejected;
+         separators_rejected_file.close();
 
-      std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_outliers_rejected.g2o";
-      std::ifstream outliers_rejected_file(outliers_rejected_file_name);
-      int number_of_outliers_rejected  = 0;
-      outliers_rejected_file >> number_of_outliers_rejected;
-      total_number_of_separators_rejected_on_all_robots += number_of_outliers_rejected;
-      outliers_rejected_file.close();
+         std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_outliers_rejected.g2o";
+         std::ifstream outliers_rejected_file(outliers_rejected_file_name);
+         int number_of_outliers_rejected  = 0;
+         outliers_rejected_file >> number_of_outliers_rejected;
+         total_number_of_separators_rejected_on_all_robots += number_of_outliers_rejected;
+         outliers_rejected_file.close();
+      }
+      total_number_of_separators_rejected_on_all_robots /= robots.size();
+
+      // Write results to csv
+      std::ofstream error_file;
+      error_file.open(error_file_name_, std::ios::out | std::ios::app);
+      auto number_of_poses = optimizer_->numberOfPosesInCurrentEstimate();
+      error_file << robots.size() << "\t" << number_of_poses << "\t" << number_of_separators << "\t" << outlier_probability_ << std::boolalpha 
+               << "\t" << incremental_solving_ << "\t" << rotation_noise_std_ << "\t" << translation_noise_std_ 
+               << "\t" << rotation_estimate_change_threshold_ << "\t" << pose_estimate_change_threshold_ 
+               << "\t" << optimizer_period_ << "\t" << confidence_probability_
+               << "\t" << std::get<0>(errors) << "\t" << std::get<1>(errors) << "\t" << std::get<2>(errors) 
+               << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ 
+               << "\t" << total_number_of_inliers_added_on_all_robots
+               << "\t" << total_number_of_outliers_added_on_all_robots 
+               << "\t" << total_number_of_separators_rejected_on_all_robots 
+               << "\t" << number_of_outliers_not_rejected
+               << "\n";
+      error_file.close();
+
+      return std::abs(std::get<0>(errors) - std::get<1>(errors)) < 0.1;
+
+   } catch(...) {
+      return false;
    }
-   total_number_of_separators_rejected_on_all_robots /= robots.size();
-
-   // Write results to csv
-   std::ofstream error_file;
-   error_file.open(error_file_name_, std::ios::out | std::ios::app);
-   auto number_of_poses = optimizer_->numberOfPosesInCurrentEstimate();
-   error_file << robots.size() << "\t" << number_of_poses << "\t" << number_of_separators << "\t" << outlier_probability_ << std::boolalpha 
-            << "\t" << incremental_solving_ << "\t" << rotation_noise_std_ << "\t" << translation_noise_std_ 
-            << "\t" << rotation_estimate_change_threshold_ << "\t" << pose_estimate_change_threshold_ 
-            << "\t" << optimizer_period_ << "\t" << confidence_probability_
-            << "\t" << std::get<0>(errors) << "\t" << std::get<1>(errors) << "\t" << std::get<2>(errors) 
-            << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ 
-            << "\t" << total_number_of_inliers_added_on_all_robots
-            << "\t" << total_number_of_outliers_added_on_all_robots 
-            << "\t" << total_number_of_separators_rejected_on_all_robots 
-            << "\t" << number_of_outliers_not_rejected
-            << "\n";
-   error_file.close();
-
-   return std::abs(std::get<0>(errors) - std::get<1>(errors)) < 0.1;
 }
 
 }
