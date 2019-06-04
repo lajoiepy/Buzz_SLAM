@@ -181,7 +181,7 @@ bool CBuzzControllerQuadMapper::StartOptimizationCondition() {
 
    bool all_neighbor_have_started = !neighbors_has_started_optimization_.empty();
    for (const auto& neighbor_info : neighbors_has_started_optimization_) {
-      all_neighbor_have_started &= neighbor_info.second;
+      all_neighbor_have_started &= neighbor_info.second && ( neighbors_state_[neighbor_info.first] <= OptimizerState::Start );
    }
 
    return all_neighbor_have_started && has_sent_start_optimization_flag_; // TODO: Add parameter to allow periodic optimization
@@ -360,12 +360,12 @@ OptimizerPhase CBuzzControllerQuadMapper::GetOptimizerPhase() {
    for (const auto& neighbor_lowest_id : neighbors_lowest_id_included_in_global_map_) {
       if (neighbors_within_communication_range_.find(neighbor_lowest_id.first) != neighbors_within_communication_range_.end()) {
          if (neighbor_lowest_id.second < lowest_id_included_in_global_map_) {
-            if (!neighbors_is_estimation_done_[neighbor_lowest_id.first] && neighbors_state_[neighbor_lowest_id.first] == optimizer_state_) {
+            if (!neighbors_is_estimation_done_[neighbor_lowest_id.first] && neighbors_state_[neighbor_lowest_id.first] <= optimizer_state_) {
                smallest_id_not_done = false;
             }
          }
          if (neighbor_lowest_id.second == lowest_id_included_in_global_map_) {
-            if ((robot_id_ > neighbor_lowest_id.first && !neighbors_is_estimation_done_[neighbor_lowest_id.first]) && neighbors_state_[neighbor_lowest_id.first] == optimizer_state_) {
+            if ((robot_id_ > neighbor_lowest_id.first && !neighbors_is_estimation_done_[neighbor_lowest_id.first]) && neighbors_state_[neighbor_lowest_id.first] <= optimizer_state_) {
                smallest_id_not_done = false;
             }
          }
@@ -389,7 +389,7 @@ void CBuzzControllerQuadMapper::CheckIfAllEstimationDoneAndReset() {
    if (is_estimation_done_) {
       bool all_done = true;
       for (const auto& neighbor_done : neighbors_is_estimation_done_) {
-         if (neighbors_within_communication_range_.find(neighbor_done.first) != neighbors_within_communication_range_.end() && neighbors_state_[neighbor_done.first] == optimizer_state_) {
+         if (neighbors_within_communication_range_.find(neighbor_done.first) != neighbors_within_communication_range_.end() && neighbors_state_[neighbor_done.first] <= optimizer_state_) {
             all_done &= neighbor_done.second;
          }
       }
@@ -409,7 +409,7 @@ bool CBuzzControllerQuadMapper::AllRobotsAreInitialized() {
    bool all_robots_initialized = optimizer_->isRobotInitialized();
    for (const auto& is_robot_initialized : optimizer_->getNeighboringRobotsInit()) {
       if (neighbors_within_communication_range_.find(((int)is_robot_initialized.first-97)) != neighbors_within_communication_range_.end()) {
-         all_robots_initialized &= is_robot_initialized.second;
+         all_robots_initialized &= is_robot_initialized.second || neighbors_state_[((int)is_robot_initialized.first-97)] > optimizer_state_;
       }
    }
    return all_robots_initialized;
@@ -846,7 +846,7 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingBarrier() {
    }
    bool stop_rotation_estimation = rotation_estimation_phase_is_finished_;
    for (const auto& is_finished : neighbors_rotation_estimation_phase_is_finished_) {
-      stop_rotation_estimation &= is_finished.second;
+      stop_rotation_estimation &= is_finished.second || neighbors_state_[is_finished.first] > optimizer_state_;
    }   
    return stop_rotation_estimation;
 }
@@ -1035,7 +1035,7 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingBarrier() {
    }
    bool stop_pose_estimation = pose_estimation_phase_is_finished_;
    for (const auto& is_finished : neighbors_pose_estimation_phase_is_finished_) {
-      stop_pose_estimation &= is_finished.second;
+      stop_pose_estimation &= is_finished.second || neighbors_state_[is_finished.first] > optimizer_state_;
    }   
    return stop_pose_estimation;
 }
