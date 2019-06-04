@@ -40,9 +40,13 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    number_of_poses_at_optimization_end_ = 0;
    neighbor_has_started_optimization_ = false;
    has_sent_start_optimization_flag_ = false;
-   previous_neighbor_id_in_optimization_order_ = robot_id_;
    is_prior_added_ = false;
    number_of_optimization_run_ = 0;
+   lowest_id_included_in_global_map_ = robot_id_;
+   lowest_id_to_include_in_global_map_ = lowest_id_included_in_global_map_;
+   buzzobj_t b_lowest_id_included_in_global_map = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_INT);
+   b_lowest_id_included_in_global_map->i.value = lowest_id_included_in_global_map_;
+   Register("lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
 
    // Isotropic noise models
    Eigen::VectorXd sigmas(6);
@@ -158,8 +162,11 @@ void CBuzzControllerQuadMapper::SetNextPosition(const CVector3& translation) {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::UpdateNeighborHasStartedOptimizationFlag(const bool& neighbor_has_started_optimization) {
+void CBuzzControllerQuadMapper::UpdateNeighborHasStartedOptimizationFlag(const bool& neighbor_has_started_optimization,
+                                                                         const int& other_robot_id,
+                                                                         const int& lowest_id_included_in_global_map) {
    neighbor_has_started_optimization_ = neighbor_has_started_optimization;
+   neighbors_lowest_id_included_in_global_map_.insert(std::make_pair(other_robot_id, lowest_id_included_in_global_map));
 }
 
 /****************************************/
@@ -212,7 +219,6 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             neighbors_rotation_estimation_phase_is_finished_.clear();
             neighbors_pose_estimation_phase_is_finished_.clear();
             neighbors_is_estimation_done_.clear();
-            previous_neighbor_id_in_optimization_order_ = robot_id_;
             latest_change_ = -1;
             number_of_steps_without_changes_ = 0;
             if (is_prior_added_) {
@@ -267,10 +273,12 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             CompareCentralizedAndDecentralizedError();
          }
          if (debug_level_ >= 1){
-            std::cout << "Robot " << robot_id_ << " End Distributed Pose Graph Optimization" << std::endl;
+            std::cout << "Robot " << robot_id_ << " End Distributed Pose Graph Optimization, Reference frame = " << lowest_id_included_in_global_map_ << std::endl;
          }
          optimizer_state_ = OptimizerState::PostEndingCommunicationDelay;
          number_of_poses_at_optimization_end_ = number_of_poses_;
+         neighbors_lowest_id_included_in_global_map_.clear();
+         lowest_id_to_include_in_global_map_ = lowest_id_included_in_global_map_;
          break;
       case PostEndingCommunicationDelay :
          optimizer_state_ = OptimizerState::Idle;
@@ -343,12 +351,20 @@ OptimizerPhase CBuzzControllerQuadMapper::GetOptimizerPhase() {
    }
    // Smallest ID not done -> estimation
    bool smallest_id_not_done = true;
-   if (robot_id_ > 0 && previous_neighbor_id_in_optimization_order_ != robot_id_) {
-      auto previous_neighbor_done = neighbors_is_estimation_done_[previous_neighbor_id_in_optimization_order_];
-      if (!previous_neighbor_done) {
-         smallest_id_not_done = false;
+   for (const auto& neighbor_lowest_id : neighbors_lowest_id_included_in_global_map_) {
+      if (neighbors_within_communication_range_.find(neighbor_lowest_id.first) != neighbors_within_communication_range_.end()) {
+         if (neighbor_lowest_id.second < lowest_id_included_in_global_map_) {
+            if (!neighbors_is_estimation_done_[neighbor_lowest_id.first]) {
+               smallest_id_not_done = false;
+            }
+         }
+         if (neighbor_lowest_id.second == lowest_id_included_in_global_map_) {
+            if (robot_id_ > neighbor_lowest_id.first && !neighbors_is_estimation_done_[neighbor_lowest_id.first]) {
+               smallest_id_not_done = false;
+            }
+         }
       }
-   }      
+   }
    auto phase = OptimizerPhase::Communication;
    if (smallest_id_not_done && !neighbors_is_estimation_done_.empty()) {
       phase = OptimizerPhase::Estimation;
@@ -560,9 +576,17 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
 
    // Add prior to the first robot
    bool has_smallest_id = true;
-   for (const auto& neighbor : neighbors_within_communication_range_) {
-      if (neighbor < robot_id_) {
+   for (const auto& neighbor_lowest_id : neighbors_lowest_id_included_in_global_map_) {
+      if (neighbor_lowest_id.second < lowest_id_included_in_global_map_) {
          has_smallest_id = false;
+         if (lowest_id_to_include_in_global_map_ > neighbor_lowest_id.second) {
+            lowest_id_to_include_in_global_map_ = neighbor_lowest_id.second;
+         }
+      }
+      if (neighbor_lowest_id.second == lowest_id_included_in_global_map_) {
+         if (robot_id_ > neighbor_lowest_id.first) {
+            has_smallest_id = false;
+         }
       }
    }
    if (has_smallest_id) {
@@ -673,11 +697,6 @@ void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& r
    neighbors_rotation_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
    neighbors_pose_estimation_phase_is_finished_.insert(std::make_pair(rid, false));
    neighbors_is_estimation_done_.insert(std::make_pair(rid, false));
-   if (previous_neighbor_id_in_optimization_order_ == robot_id_ && rid < robot_id_) {
-      previous_neighbor_id_in_optimization_order_ = rid;
-   } else if (previous_neighbor_id_in_optimization_order_ < rid && rid < robot_id_) {
-      previous_neighbor_id_in_optimization_order_ = rid;
-   }
 }
 
 /****************************************/
@@ -1052,6 +1071,11 @@ void CBuzzControllerQuadMapper::EndOptimization() {
       }
    }
    WriteOptimizedDataset();
+
+   lowest_id_included_in_global_map_ = lowest_id_to_include_in_global_map_;
+   buzzobj_t b_lowest_id_included_in_global_map = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_INT);
+   b_lowest_id_included_in_global_map->i.value = lowest_id_included_in_global_map_;
+   Register("lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
 }
 
 /****************************************/

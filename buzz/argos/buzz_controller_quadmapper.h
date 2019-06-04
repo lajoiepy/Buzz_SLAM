@@ -128,9 +128,11 @@ public:
 
    void UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id, const graph_utils::PoseWithCovariance& pose);
 
-   void UpdateNeighborHasStartedOptimizationFlag(const bool& neighbor_has_started_optimization);
+   void UpdateNeighborHasStartedOptimizationFlag(const bool& neighbor_has_started_optimization,
+                                                      const int& other_robot_id,
+                                                      const int& lowest_id_included_in_global_map);
 
-   void UpdateHasSentStartOptimizationFlag(const bool& neighbor_has_started_optimization);
+   void UpdateHasSentStartOptimizationFlag(const bool& has_sent_start_optimization_flag);
 
 protected:
 
@@ -241,6 +243,8 @@ protected:
 
    std::map<int, OptimizerState> neighbors_state_;
 
+   std::map<int, int> neighbors_lowest_id_included_in_global_map_;
+
    bool is_estimation_done_;
 
    gtsam::NonlinearFactorGraph local_pose_graph_before_optimization_;
@@ -262,6 +266,8 @@ protected:
    int number_of_steps_before_failsafe_;
 
    int number_of_optimization_run_;
+
+   int lowest_id_to_include_in_global_map_, lowest_id_included_in_global_map_;
 
    // Parameters
    double rotation_noise_std_, translation_noise_std_;

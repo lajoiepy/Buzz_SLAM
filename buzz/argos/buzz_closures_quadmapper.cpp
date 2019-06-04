@@ -895,9 +895,34 @@ static int BuzzUpdateHasSentStartOptimizationFlag(buzzvm_t vm) {
 /****************************************/
 
 static int BuzzUpdateNeighborHasStartedOptimizationFlag(buzzvm_t vm) {
+
+
+   buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
+   
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 2);
+   int rid;
+   buzzobj_t buzz_lowest_id = buzzvm_stack_at(vm, 1);
+   int lowest_id;
+
+   if(buzz_rid->o.type == BUZZTYPE_INT &&
+      buzz_lowest_id->o.type == BUZZTYPE_INT) {
+      rid = buzz_rid->i.value;
+      lowest_id = buzz_lowest_id->i.value;
+   }
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "BuzzUpdateNeighborHasStartedOptimizationFlag: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[buzz_rid->o.type]
+         );
+      return vm->state;
+   } 
+
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborHasStartedOptimizationFlag(true);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborHasStartedOptimizationFlag(true, rid, lowest_id);
 }
 
 /****************************************/
