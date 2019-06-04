@@ -409,7 +409,7 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
          return false; // File does not exists yet
       }
       gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
-      if (std::abs(((int) graph_and_values.second->size()) - expected_size) > 2) {
+      if (graph_and_values.second->size() < expected_size) {
          return false; // File not update yet
       }
       for (const gtsam::Values::ConstKeyValuePair &key_value: *graph_and_values.second) {

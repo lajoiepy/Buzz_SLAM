@@ -852,16 +852,21 @@ static int BuzzNeighborState(buzzvm_t vm){
 
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
+   buzzvm_lload(vm, 3);
    
-   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 2);
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 3);
    int rid;
-   buzzobj_t buzz_state = buzzvm_stack_at(vm, 1);
+   buzzobj_t buzz_state = buzzvm_stack_at(vm, 2);
    int state;
+   buzzobj_t buzz_lowest_id = buzzvm_stack_at(vm, 1);
+   int lowest_id;
 
    if(buzz_rid->o.type == BUZZTYPE_INT &&
-      buzz_state->o.type == BUZZTYPE_INT) {
+      buzz_state->o.type == BUZZTYPE_INT &&
+      buzz_lowest_id->o.type == BUZZTYPE_INT) {
       rid = buzz_rid->i.value;
       state = buzz_state->i.value;
+      lowest_id = buzz_lowest_id->i.value;
    }
    else {
       buzzvm_seterror(vm,
@@ -877,7 +882,7 @@ static int BuzzNeighborState(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborState(rid, (buzz_quadmapper::OptimizerState) state);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborState(rid, (buzz_quadmapper::OptimizerState) state, lowest_id);
 
    return buzzvm_ret0(vm);
 }
@@ -898,17 +903,12 @@ static int BuzzUpdateNeighborHasStartedOptimizationFlag(buzzvm_t vm) {
 
 
    buzzvm_lload(vm, 1);
-   buzzvm_lload(vm, 2);
    
-   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 2);
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 1);
    int rid;
-   buzzobj_t buzz_lowest_id = buzzvm_stack_at(vm, 1);
-   int lowest_id;
 
-   if(buzz_rid->o.type == BUZZTYPE_INT &&
-      buzz_lowest_id->o.type == BUZZTYPE_INT) {
+   if(buzz_rid->o.type == BUZZTYPE_INT) {
       rid = buzz_rid->i.value;
-      lowest_id = buzz_lowest_id->i.value;
    }
    else {
       buzzvm_seterror(vm,
@@ -922,7 +922,7 @@ static int BuzzUpdateNeighborHasStartedOptimizationFlag(buzzvm_t vm) {
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborHasStartedOptimizationFlag(true, rid, lowest_id);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborHasStartedOptimizationFlag(true, rid);
 }
 
 /****************************************/

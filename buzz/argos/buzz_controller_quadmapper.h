@@ -122,15 +122,14 @@ public:
 
    void CheckIfAllEstimationDoneAndReset();
 
-   void NeighborState(const int& rid, const OptimizerState& state);
+   void NeighborState(const int& rid, const OptimizerState& state, const int& lowest_id_included_in_global_map);
 
    void UpdateCurrentPoseEstimate(const int& pose_id);
 
    void UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id, const graph_utils::PoseWithCovariance& pose);
 
    void UpdateNeighborHasStartedOptimizationFlag(const bool& neighbor_has_started_optimization,
-                                                      const int& other_robot_id,
-                                                      const int& lowest_id_included_in_global_map);
+                                                const int& other_robot_id);
 
    void UpdateHasSentStartOptimizationFlag(const bool& has_sent_start_optimization_flag);
 
@@ -255,7 +254,9 @@ protected:
 
    int total_outliers_rejected_;
 
-   bool neighbor_has_started_optimization_, has_sent_start_optimization_flag_;
+   bool has_sent_start_optimization_flag_;
+
+   std::map<int, bool> neighbors_has_started_optimization_;
 
    int previous_neighbor_id_in_optimization_order_;
 
