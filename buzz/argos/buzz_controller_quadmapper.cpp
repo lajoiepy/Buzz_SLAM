@@ -225,6 +225,8 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             latest_change_ = -1;
             number_of_steps_without_changes_ = 0;
             lowest_id_to_include_in_global_map_ = lowest_id_included_in_global_map_;
+            neighbors_has_started_optimization_.clear();
+            has_sent_start_optimization_flag_ = false;
             if (is_prior_added_) {
                optimizer_->removePrior();
                is_prior_added_ = false;
@@ -237,8 +239,6 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          }
          optimizer_state_ = OptimizerState::RotationEstimation;
          StartPoseGraphOptimization();
-         neighbors_has_started_optimization_.clear();
-         has_sent_start_optimization_flag_ = false;
          break;
       case RotationEstimation :
          current_rotation_iteration_++;
@@ -603,7 +603,7 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
       optimizer_->addPrior(first_key, poses_initial_guess_->at<gtsam::Pose3>(first_key), noise_model_);
       is_prior_added_ = true;
       if (debug_level_ >= 2) {
-         std::cout << "Robot " << robot_id_ << " : Add prior." << std::endl;
+         std::cout << "Robot " << robot_id_ << " : Add prior. Key=" << first_key << std::endl;
       }
    }
    

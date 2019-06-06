@@ -414,11 +414,17 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
    for (const auto& i : robots) {
       std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_optimized.g2o";
       if (!boost::filesystem::exists(dataset_file_name)) {
+         if (debug_level_ >= 2) {
+            std::cout << "Robot " << robot_id_ << " Evaluation : Other files do not exist yet" << std::endl;
+         }
          return false; // File does not exists yet
       }
       gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
-      if (graph_and_values.second->size() < expected_size) {
-         return false; // File not update yet
+      if (graph_and_values.second->size() < expected_size-2) {
+         if (debug_level_ >= 2) {
+            std::cout << "Robot " << robot_id_ << " Evaluation : Other file too small expected size=" << expected_size << ", actual size=" << graph_and_values.second->size() << std::endl;
+         }
+         return false; // File not updated yet
       }
       for (const gtsam::Values::ConstKeyValuePair &key_value: *graph_and_values.second) {
          gtsam::Key key = key_value.key;
@@ -501,7 +507,7 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
          total_number_of_separators_rejected_on_all_robots += number_of_outliers_rejected;
          outliers_rejected_file.close();
       }
-      total_number_of_separators_rejected_on_all_robots /= robots.size();
+      //total_number_of_separators_rejected_on_all_robots /= robots.size();
 
       // Write results to csv
       std::ofstream error_file;
