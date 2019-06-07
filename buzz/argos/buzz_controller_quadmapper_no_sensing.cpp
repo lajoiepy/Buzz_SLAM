@@ -163,14 +163,21 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement() {
 
    // Update attributes value
    previous_simulation_gt_pose_ = m_pcPos->GetReading();
-   auto new_pose_ = poses_initial_guess_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+   auto new_pose = poses_initial_guess_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+
+   // Save initial guess without update (to compute errors)
+   auto new_pose_no_updates = poses_initial_guess_no_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+   poses_initial_guess_no_updates_->insert(current_symbol_.key(), new_pose_no_updates);
+   
+   // Update attributes
    previous_symbol_ = current_symbol_;
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(new_factor);
+   local_pose_graph_no_updates_->push_back(new_factor);
 
    // Add new pose estimate into initial guess
-   poses_initial_guess_->insert(current_symbol_.key(), new_pose_);
+   poses_initial_guess_->insert(current_symbol_.key(), new_pose);
 
    // Add transform to local map for pairwise consistency maximization
    robot_local_map_.addTransform(new_factor, covariance_matrix_);
@@ -304,6 +311,7 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(new_factor);
+   local_pose_graph_no_updates_->push_back(new_factor);
 
    // Add transform to local map for pairwise consistency maximization
    robot_local_map_.addTransform(new_factor, covariance_matrix_);

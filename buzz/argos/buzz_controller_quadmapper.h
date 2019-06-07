@@ -208,7 +208,11 @@ protected:
    // Measurements
    boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_;
 
+   boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_no_updates_;
+
    boost::shared_ptr<gtsam::Values> poses_initial_guess_;
+
+   boost::shared_ptr<gtsam::Values> poses_initial_guess_no_updates_;
 
    gtsam::GraphAndValues graph_and_values_;
 
