@@ -116,7 +116,7 @@ public:
 
    void NeighborRotationEstimationIsFinished(const int& rid);
 
-   void NeighborPoseEstimationIsFinished(const int& rid);
+   void NeighborPoseEstimationIsFinished(const int& rid, const gtsam::Point3& anchor_offset);
 
    OptimizerPhase GetOptimizerPhase();
 
@@ -239,6 +239,12 @@ protected:
    bool rotation_estimation_phase_is_finished_, pose_estimation_phase_is_finished_;
 
    std::map<int, bool> neighbors_rotation_estimation_phase_is_finished_, neighbors_pose_estimation_phase_is_finished_, neighbors_is_estimation_done_;
+
+   gtsam::Point3 anchor_offset_;
+
+   std::map<int, gtsam::Point3> neighbors_anchor_offset_;
+
+   int prior_owner_;
 
    std::map<int, OptimizerState> neighbors_state_;
 

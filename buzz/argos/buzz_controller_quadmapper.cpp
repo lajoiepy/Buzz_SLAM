@@ -46,6 +46,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    buzzobj_t b_lowest_id_included_in_global_map = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_INT);
    b_lowest_id_included_in_global_map->i.value = lowest_id_included_in_global_map_;
    Register("lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
+   anchor_offset_ = gtsam::Point3();
 
    // Isotropic noise models
    Eigen::VectorXd sigmas(6);
@@ -221,6 +222,7 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
             neighbors_within_communication_range_.clear();
             neighbors_rotation_estimation_phase_is_finished_.clear();
             neighbors_pose_estimation_phase_is_finished_.clear();
+            neighbors_anchor_offset_.clear();
             neighbors_is_estimation_done_.clear();
             latest_change_ = -1;
             number_of_steps_without_changes_ = 0;
@@ -582,23 +584,24 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
    optimizer_->loadSubgraphAndCreateSubgraphEdge(graph_and_values_);
 
    // Add prior to the first robot
-   bool has_smallest_id = true;
+   std::pair<int, int> best_pair = std::make_pair(robot_id_, lowest_id_included_in_global_map_);
    for (const auto& neighbor_lowest_id : neighbors_lowest_id_included_in_global_map_) {
       if (neighbors_within_communication_range_.find(neighbor_lowest_id.first) != neighbors_within_communication_range_.end()) {
-         if (neighbor_lowest_id.second < lowest_id_included_in_global_map_) {
-            has_smallest_id = false;
+         if (neighbor_lowest_id.second < best_pair.second) {
+            best_pair = neighbor_lowest_id;
             if (lowest_id_to_include_in_global_map_ > neighbor_lowest_id.second) {
                lowest_id_to_include_in_global_map_ = neighbor_lowest_id.second;
             }
          }
-         if (neighbor_lowest_id.second == lowest_id_included_in_global_map_) {
-            if (robot_id_ > neighbor_lowest_id.first) {
-               has_smallest_id = false;
+         if (neighbor_lowest_id.second == best_pair.second) {
+            if (best_pair.first > neighbor_lowest_id.first) {
+               best_pair = neighbor_lowest_id;
             }
          }
       }
    }
-   if (has_smallest_id) {
+   prior_owner_ = best_pair.first;
+   if (best_pair.first == robot_id_) {
       gtsam::Key first_key = gtsam::KeyVector(poses_initial_guess_->keys()).at(0);
       optimizer_->addPrior(first_key, poses_initial_guess_->at<gtsam::Pose3>(first_key), noise_model_);
       is_prior_added_ = true;
@@ -995,9 +998,14 @@ void CBuzzControllerQuadMapper::NeighborRotationEstimationIsFinished(const int& 
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::NeighborPoseEstimationIsFinished(const int& rid) {
+void CBuzzControllerQuadMapper::NeighborPoseEstimationIsFinished(const int& rid, const gtsam::Point3& anchor_offset) {
    if ( neighbors_within_communication_range_.find(rid) != neighbors_within_communication_range_.end() ) {
       neighbors_pose_estimation_phase_is_finished_.at(rid) = true;
+      if (neighbors_anchor_offset_.find(rid) != neighbors_anchor_offset_.end()) {
+         neighbors_anchor_offset_[rid] = anchor_offset;
+      } else {
+         neighbors_anchor_offset_.insert(std::make_pair(rid, anchor_offset));
+      }
    }
 }
 
@@ -1013,6 +1021,15 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    }
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < pose_estimate_change_threshold_ && current_pose_iteration_ != 0) {
       pose_estimation_phase_is_finished_ = true;
+
+      gtsam::Key first_key = gtsam::KeyVector(poses_initial_guess_->keys()).at(0);
+      auto anchor_point = poses_initial_guess_->at<gtsam::Pose3>(first_key).translation();
+      anchor_offset_ = anchor_point - ( optimizer_->currentEstimate().at<gtsam::Pose3>(first_key).translation() + gtsam::Point3(optimizer_->linearizedPoses().at(first_key).tail(3)) );
+      buzzobj_t b_offset = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+      for (int i = 0; i < 3; i++) {
+         TablePut(b_offset, i, anchor_offset_.vector()[i]);
+      }
+      Register("anchor_offset", b_offset);
    }
    return pose_estimation_phase_is_finished_;
 }
@@ -1046,7 +1063,7 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingBarrier() {
 void CBuzzControllerQuadMapper::SetRotationEstimationIsFinishedFlagsToFalse() {
    for (auto& is_finished : neighbors_rotation_estimation_phase_is_finished_) {
       is_finished.second = false;
-   }
+   } 
 }
 
 /****************************************/
@@ -1062,7 +1079,11 @@ void CBuzzControllerQuadMapper::SetPoseEstimationIsFinishedFlagsToFalse() {
 /****************************************/
 
 void CBuzzControllerQuadMapper::EndOptimization() {
-   optimizer_->retractPose3Global();
+   if (prior_owner_ == robot_id_) {
+      optimizer_->retractPose3GlobalWithOffset(anchor_offset_);
+   } else {
+      optimizer_->retractPose3GlobalWithOffset(neighbors_anchor_offset_[prior_owner_]);
+   }
    if (incremental_solving_) {
       poses_initial_guess_->update(optimizer_->currentEstimate());
 

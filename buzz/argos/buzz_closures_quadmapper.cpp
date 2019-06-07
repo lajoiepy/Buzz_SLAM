@@ -821,11 +821,33 @@ static int BuzzNeighborRotationEstimationIsFinished(buzzvm_t vm){
 static int BuzzNeighborPoseEstimationIsFinished(buzzvm_t vm){
 
    buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
    
-   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 1);
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 2);
    int rid;
+   buzzobj_t buzz_anchor_offset = buzzvm_stack_at(vm, 1);
+   gtsam::Point3 anchor_offset;
 
-   if(buzz_rid->o.type == BUZZTYPE_INT) rid = buzz_rid->i.value;
+   if(buzz_rid->o.type == BUZZTYPE_INT &&
+      buzz_anchor_offset->o.type == BUZZTYPE_TABLE) {
+      rid = buzz_rid->i.value;
+
+      int table_size = buzzdict_size(buzz_anchor_offset->t.value);
+      double anchor_elem;
+      std::vector<double> anchor_elems;
+      for (int32_t i = 0; i < table_size; ++i) {
+         buzzvm_dup(vm);
+         buzzvm_pushi(vm, i);
+         buzzvm_tget(vm);
+         buzzvm_type_assert(vm, 1, BUZZTYPE_FLOAT);
+         buzzobj_t b_anchor_value = buzzvm_stack_at(vm, 1);
+         buzzvm_pop(vm);
+         anchor_elem = b_anchor_value->f.value;
+         anchor_elems.emplace_back(anchor_elem);
+      }
+      anchor_offset = gtsam::Point3(anchor_elems[0], anchor_elems[1], anchor_elems[2]);
+
+   } 
    else {
       buzzvm_seterror(vm,
                       BUZZVM_ERROR_TYPE,
@@ -840,7 +862,7 @@ static int BuzzNeighborPoseEstimationIsFinished(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborPoseEstimationIsFinished(rid);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborPoseEstimationIsFinished(rid, anchor_offset);
 
    return buzzvm_ret0(vm);
 }
