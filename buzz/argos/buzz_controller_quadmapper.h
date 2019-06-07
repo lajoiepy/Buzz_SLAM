@@ -72,7 +72,8 @@ public:
                         const float& rotation_noise_std, const float& translation_noise_std,
                         const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                         const bool& use_flagged_initialization, const bool& is_simulation,
-                        const int& number_of_robots, const std::string& error_file_name);
+                        const int& number_of_robots, const std::string& error_file_name,
+                        const int& max_number_of_rotation_estimation_steps, const int& max_number_of_pose_estimation_steps);
 
    // Control functions
    void SetNextPosition(const CVector3& c_heading);
@@ -298,6 +299,8 @@ protected:
    int end_delay_;
 
    bool incremental_solving_;
+
+   int max_number_of_rotation_estimation_steps_, max_number_of_pose_estimation_steps_;
 
    // Pairwise consistency maximization parameters
    double confidence_probability_;

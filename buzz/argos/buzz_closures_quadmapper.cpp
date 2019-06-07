@@ -687,7 +687,11 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 11);
    buzzvm_lload(vm, 12);
    buzzvm_lload(vm, 13);
+   buzzvm_lload(vm, 14);
+   buzzvm_lload(vm, 15);
    /* Retrieve parameters and check their types */
+   buzzobj_t b_max_steps_rotation = buzzvm_stack_at(vm, 15);
+   buzzobj_t b_max_steps_pose = buzzvm_stack_at(vm, 14);
    buzzobj_t b_number_of_steps_before_failsafe = buzzvm_stack_at(vm, 13);
    buzzobj_t b_use_pcm = buzzvm_stack_at(vm, 12);
    buzzobj_t b_confidence_probability = buzzvm_stack_at(vm, 11);
@@ -709,6 +713,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    double confidence_probability;
    bool use_pcm;
    int number_of_steps_before_failsafe;
+   int max_steps_rotation, max_steps_pose;
 
    if(b_rotation_noise_std->o.type == BUZZTYPE_FLOAT &&
       b_translation_noise_std->o.type == BUZZTYPE_FLOAT &&
@@ -722,7 +727,9 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_incremental_solving->o.type == BUZZTYPE_INT &&
       b_confidence_probability->o.type == BUZZTYPE_FLOAT &&
       b_use_pcm->o.type == BUZZTYPE_INT &&
-      b_number_of_steps_before_failsafe->o.type == BUZZTYPE_INT) {
+      b_number_of_steps_before_failsafe->o.type == BUZZTYPE_INT &&
+      b_max_steps_rotation->o.type == BUZZTYPE_INT &&
+      b_max_steps_pose->o.type) {
 
       // Fill in variables
       rotation_noise_std = b_rotation_noise_std->f.value;
@@ -738,6 +745,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       confidence_probability = b_confidence_probability->f.value;
       use_pcm = (bool) b_use_pcm->i.value;
       number_of_steps_before_failsafe = b_number_of_steps_before_failsafe->i.value;
+      max_steps_rotation = b_max_steps_rotation->i.value;
+      max_steps_pose = b_max_steps_pose->i.value;
 
    } else {
       buzzvm_seterror(vm,
@@ -755,7 +764,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,
-                     number_of_robots, error_file_name);
+                     number_of_robots, error_file_name,
+                     max_steps_rotation, max_steps_pose);
    return buzzvm_ret0(vm);
 }
 

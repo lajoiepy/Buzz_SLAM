@@ -66,7 +66,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    std::remove(log_file_name.c_str());
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_outliers_rejected.g2o";
+   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
    std::remove(log_file_name.c_str());
 
 
@@ -80,7 +80,8 @@ void CBuzzControllerQuadMapper::LoadParameters( const int& number_of_steps_befor
                                                 const float& rotation_noise_std, const float& translation_noise_std,
                                                 const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                                                 const bool& use_flagged_initialization, const bool& is_simulation,
-                                                const int& number_of_robots, const std::string& error_file_name) {
+                                                const int& number_of_robots, const std::string& error_file_name,
+                                                const int& max_number_of_rotation_estimation_steps, const int& max_number_of_pose_estimation_steps) {
    rotation_noise_std_ = rotation_noise_std;
    translation_noise_std_ = translation_noise_std;
    rotation_estimate_change_threshold_ = rotation_estimate_change_threshold;
@@ -95,6 +96,8 @@ void CBuzzControllerQuadMapper::LoadParameters( const int& number_of_steps_befor
    confidence_probability_ = confidence_probability;
    use_pcm_ = use_pcm;
    number_of_steps_before_failsafe_ = number_of_steps_before_failsafe;
+   max_number_of_rotation_estimation_steps_ = max_number_of_rotation_estimation_steps;
+   max_number_of_pose_estimation_steps_ = max_number_of_pose_estimation_steps;
 }
 
 /****************************************/
@@ -479,7 +482,7 @@ void CBuzzControllerQuadMapper::WriteOptimizedDataset() {
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
    dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized_" + std::to_string(number_of_optimization_run_) + ".g2o";
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
-   std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_outliers_rejected.g2o";
+   std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
    std::ofstream outliers_rejected_file;
    outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
    outliers_rejected_file << total_outliers_rejected_ << "\n" ;
@@ -829,6 +832,13 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
 /****************************************/
 
 bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
+   if (current_rotation_iteration_ > max_number_of_rotation_estimation_steps_) {
+      optimizer_state_ = OptimizerState::Idle;
+      if (debug_level_ >= 1) {
+         std::cout << "Robot " << robot_id_ << " Stop estimation, Maximum number of iteration reached." << std::endl;
+      }
+      return false;
+   }
    // Stopping condition
    rotation_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();
@@ -1020,6 +1030,13 @@ void CBuzzControllerQuadMapper::NeighborPoseEstimationIsFinished(const int& rid,
 /****************************************/
 
 bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
+   if (current_pose_iteration_ > max_number_of_pose_estimation_steps_) {
+      optimizer_state_ = OptimizerState::Idle;
+      if (debug_level_ >= 1) {
+         std::cout << "Robot " << robot_id_ << " Stop estimation, Maximum number of iteration reached." << std::endl;
+      }
+      return false;
+   }
    // Stopping condition
    pose_estimation_phase_is_finished_ = false;
    double change = optimizer_->latestChange();

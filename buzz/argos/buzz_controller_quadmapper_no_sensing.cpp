@@ -507,15 +507,8 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
          separators_rejected_file >> number_of_separators_rejected;
          total_number_of_separators_rejected_on_all_robots += number_of_separators_rejected;
          separators_rejected_file.close();
-
-         std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_outliers_rejected.g2o";
-         std::ifstream outliers_rejected_file(outliers_rejected_file_name);
-         int number_of_outliers_rejected  = 0;
-         outliers_rejected_file >> number_of_outliers_rejected;
-         total_number_of_separators_rejected_on_all_robots += number_of_outliers_rejected;
-         outliers_rejected_file.close();
       }
-      //total_number_of_separators_rejected_on_all_robots /= robots.size();
+      total_number_of_separators_rejected_on_all_robots /= robots.size();
 
       // Write results to csv
       std::ofstream error_file;
