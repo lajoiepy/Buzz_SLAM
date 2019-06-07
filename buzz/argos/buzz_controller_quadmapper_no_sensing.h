@@ -49,6 +49,8 @@ protected:
 
    virtual bool CompareCentralizedAndDecentralizedError();
 
+   void ComputeCentralizedEstimate();
+
    virtual void WriteInitialDataset();
 
    virtual void WriteOptimizedDataset();

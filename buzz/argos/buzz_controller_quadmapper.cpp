@@ -835,7 +835,8 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    if (debug_level_ >= 2) {
       std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
    }
-   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_ && current_rotation_iteration_ != 0) {
+   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_
+       && current_rotation_iteration_ != 0 && std::abs(change) > 1e-8) {
       rotation_estimation_phase_is_finished_ = true;
    }
    return rotation_estimation_phase_is_finished_;
@@ -1025,7 +1026,8 @@ bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    if (debug_level_ >= 2) {
       std::cout << "[optimize pose] Change (Robot " << robot_id_ << "): " << change << std::endl;
    }
-   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < pose_estimate_change_threshold_ && current_pose_iteration_ != 0) {
+   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < pose_estimate_change_threshold_ 
+      && current_pose_iteration_ != 0 && std::abs(change) > 1e-8) {
       pose_estimation_phase_is_finished_ = true;
 
       gtsam::Key first_key = gtsam::KeyVector(poses_initial_guess_->keys()).at(0);
@@ -1109,12 +1111,13 @@ void CBuzzControllerQuadMapper::EndOptimization() {
          }
       }
    }
-   WriteOptimizedDataset();
 
    lowest_id_included_in_global_map_ = lowest_id_to_include_in_global_map_;
    buzzobj_t b_lowest_id_included_in_global_map = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_INT);
    b_lowest_id_included_in_global_map->i.value = lowest_id_included_in_global_map_;
    Register("lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
+
+   WriteOptimizedDataset();
 }
 
 /****************************************/
