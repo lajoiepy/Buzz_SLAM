@@ -216,8 +216,7 @@ void CBuzzControllerQuadMapper::FailSafeCheck() {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
-   number_of_poses_++;
+void CBuzzControllerQuadMapper::OptimizerTick() {
    // Update optimizer state
    switch (optimizer_state_) {
       case Idle :
@@ -294,6 +293,13 @@ void CBuzzControllerQuadMapper::IncrementNumberOfPosesAndUpdateState() {
          optimizer_state_ = OptimizerState::Idle;
          break;
    }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::IncrementNumberOfPoses() {
+   number_of_poses_++;
 }
 
 /****************************************/

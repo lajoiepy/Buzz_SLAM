@@ -95,6 +95,8 @@ public:
    // Functions related to distributed_mapper
    void InitOptimizer(const int& period);
 
+   void OptimizerTick();
+
    void AddNeighborWithinCommunicationRange(const int& rid);
 
    OptimizerState GetOptimizerState();
@@ -159,8 +161,8 @@ protected:
 
    virtual void WriteOptimizedDataset();
 
-   // Wrapper function related to distributed_mapper
-   void IncrementNumberOfPosesAndUpdateState();
+   // Wrapper functions related to distributed_mapper
+   void IncrementNumberOfPoses();
 
    bool StartOptimizationCondition();
 

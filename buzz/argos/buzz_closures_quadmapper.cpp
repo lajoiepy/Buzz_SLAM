@@ -48,6 +48,16 @@ static int BuzzOptimizerState(buzzvm_t vm){
 /****************************************/
 /****************************************/
 
+static int BuzzOptimizerTick(buzzvm_t vm) {
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->OptimizerTick();
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
+/****************************************/
+
 static int BuzzOptimizerPhase(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
@@ -65,6 +75,7 @@ static int BuzzCheckIfAllEstimationDoneAndReset(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->CheckIfAllEstimationDoneAndReset();
+   return buzzvm_ret0(vm);
 }
 
 /****************************************/
@@ -227,6 +238,7 @@ static int BuzzEstimateRotationAndUpdateRotation(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->EstimateRotationAndUpdateRotation();
+   return buzzvm_ret0(vm);
 }
 
 /****************************************/
@@ -359,6 +371,7 @@ static int BuzzEstimatePoseAndUpdatePose(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->EstimatePoseAndUpdatePose();
+   return buzzvm_ret0(vm);
 }
 
 /****************************************/
@@ -955,6 +968,7 @@ static int BuzzUpdateNeighborHasStartedOptimizationFlag(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborHasStartedOptimizationFlag(true, rid);
+   return buzzvm_ret0(vm);
 }
 
 /****************************************/
@@ -991,6 +1005,10 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "optimizer_state", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzOptimizerState));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "optimizer_tick", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzOptimizerTick));
    buzzvm_gstore(m_tBuzzVM);
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "add_neighbor_within_communication_range", 1));
