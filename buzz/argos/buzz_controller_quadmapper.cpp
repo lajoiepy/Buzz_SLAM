@@ -246,8 +246,8 @@ void CBuzzControllerQuadMapper::OptimizerTick() {
          }optimizer_state_ = OptimizerState::Initialization;
          break;
       case Initialization :
-         InitializePoseGraphOptimization();
          optimizer_state_ = OptimizerState::RotationEstimation;
+         InitializePoseGraphOptimization();
          break;
       case RotationEstimation :
          if (RotationEstimationStoppingBarrier()) {
@@ -657,6 +657,13 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
          auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
                                  graph_and_values_, robot_local_map_, pose_estimates_from_neighbors_.at(robot),
                                  confidence_probability_, is_prior_added_);
+         if (max_clique_info.first < 2) {
+            if (debug_level_ >= 1) {
+               std::cout << "Robot " << robot_id_ << " Outliers filtering, not enough separators accepted : stop estimation" << std::endl;
+            }
+            optimizer_state_ = OptimizerState::Idle;
+         }
+         
          number_of_measurements_accepted += max_clique_info.first;
          number_of_measurements_rejected += max_clique_info.second;
       }
