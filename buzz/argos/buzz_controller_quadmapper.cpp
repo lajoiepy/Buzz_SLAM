@@ -250,7 +250,6 @@ void CBuzzControllerQuadMapper::OptimizerTick() {
          optimizer_state_ = OptimizerState::RotationEstimation;
          break;
       case RotationEstimation :
-         current_rotation_iteration_++;
          if (RotationEstimationStoppingBarrier()) {
             // Change optimizer state
             optimizer_state_ = OptimizerState::PoseEstimationInitialization;
@@ -269,7 +268,6 @@ void CBuzzControllerQuadMapper::OptimizerTick() {
          optimizer_state_ = OptimizerState::PoseEstimation;
          break;
       case PoseEstimation :
-         current_pose_iteration_++;
          if (PoseEstimationStoppingBarrier()) {
             // Change optimizer state
             optimizer_state_ = OptimizerState::End;
@@ -826,6 +824,7 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
          optimizer_->estimateRotation();
          optimizer_->updateRotation();
          optimizer_->updateInitialized(true);
+         current_rotation_iteration_++;
       } catch(const std::exception& ex) {
          if (debug_level_ >= 1) {
             std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
@@ -1002,6 +1001,7 @@ void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
       optimizer_->estimatePoses();
       optimizer_->updatePoses();
       optimizer_->updateInitialized(true);
+      current_pose_iteration_++;
    } catch(const std::exception& ex) {
       if (debug_level_ >= 1) {
          std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
