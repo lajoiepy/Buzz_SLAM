@@ -22,7 +22,7 @@ namespace buzz_quadmapper {
 /*
 *  Enum of all the possible state of the optimizer
 */
-enum OptimizerState { Idle, Start, RotationEstimation, PoseEstimationInitialization, PoseEstimation, End, PostEndingCommunicationDelay };
+enum OptimizerState { Idle, Start, Initialization, RotationEstimation, PoseEstimationInitialization, PoseEstimation, End, PostEndingCommunicationDelay };
 
 /*
 *  Enum of the phases during the distributed optimization
@@ -166,7 +166,7 @@ protected:
 
    bool StartOptimizationCondition();
 
-   void StartPoseGraphOptimization();
+   void InitializePoseGraphOptimization();
 
    void UpdateOptimizer();
 

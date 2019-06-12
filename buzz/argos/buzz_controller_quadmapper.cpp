@@ -243,9 +243,11 @@ void CBuzzControllerQuadMapper::OptimizerTick() {
       case Start :
          if (debug_level_ >= 1){
             std::cout << "Robot " << robot_id_ << " Start Distributed Pose Graph Optimization" << std::endl;
-         }
+         }optimizer_state_ = OptimizerState::Initialization;
+         break;
+      case Initialization :
+         InitializePoseGraphOptimization();
          optimizer_state_ = OptimizerState::RotationEstimation;
-         StartPoseGraphOptimization();
          break;
       case RotationEstimation :
          current_rotation_iteration_++;
@@ -563,7 +565,7 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::StartPoseGraphOptimization() {
+void CBuzzControllerQuadMapper::InitializePoseGraphOptimization() {
    
    RemoveDisconnectedNeighbors();
 
@@ -594,7 +596,10 @@ void CBuzzControllerQuadMapper::SaveInitialGraph() {
 /****************************************/
 
 void CBuzzControllerQuadMapper::UpdateOptimizer() {
-   
+
+   // Reinitialize optimizer control attributes
+   optimizer_->reinit();
+
    // Load subgraphs
    optimizer_->loadSubgraphAndCreateSubgraphEdge(graph_and_values_);
 
@@ -902,6 +907,7 @@ void CBuzzControllerQuadMapper::InitializePoseEstimation() {
    for (auto& neighbor_done : neighbors_is_estimation_done_) {
       neighbor_done.second = false;
    }
+   optimizer_->resetLatestChange();
 }
 
 /****************************************/
