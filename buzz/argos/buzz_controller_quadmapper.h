@@ -202,6 +202,8 @@ protected:
 
    void FailSafeCheck();
 
+   virtual void SaveRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys);
+
 protected:
    // General attributes of the controller
    uint16_t robot_id_;

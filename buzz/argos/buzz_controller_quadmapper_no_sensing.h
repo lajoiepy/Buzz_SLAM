@@ -57,6 +57,12 @@ protected:
 
    std::set<std::pair<gtsam::Key, gtsam::Key>> AggregateOutliersKeys(const std::set<int>& robots);
 
+   std::pair<int, int> CountInliersAndOutliers(const std::set<int>& robots);
+
+   virtual void SaveRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys);
+
+   void RemoveRejectedKeys();
+
 private:
 
    // Ground truth information to compute fake measurements
@@ -79,6 +85,8 @@ private:
    double outlier_probability_;
    double sensor_range_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys_;
+   std::set<std::pair<gtsam::Key, gtsam::Key>> inliers_keys_;
+   std::set<std::pair<gtsam::Key, gtsam::Key>> rejected_keys_;
 
 };
 }

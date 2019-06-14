@@ -488,11 +488,6 @@ void CBuzzControllerQuadMapper::WriteOptimizedDataset() {
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
    dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized_" + std::to_string(number_of_optimization_run_) + ".g2o";
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
-   std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
-   std::ofstream outliers_rejected_file;
-   outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
-   outliers_rejected_file << total_outliers_rejected_ << "\n" ;
-   outliers_rejected_file.close();
    number_of_optimization_run_++;
 }
 
@@ -657,17 +652,24 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
          auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
                                  graph_and_values_, robot_local_map_, pose_estimates_from_neighbors_.at(robot),
                                  confidence_probability_, is_prior_added_);
-         if (max_clique_info.first < 2) {
+         if (max_clique_info.first.first < 2) {
             if (debug_level_ >= 1) {
                std::cout << "Robot " << robot_id_ << " Outliers filtering, not enough separators accepted : stop estimation" << std::endl;
             }
             optimizer_state_ = OptimizerState::Idle;
          }
          
-         number_of_measurements_accepted += max_clique_info.first;
-         number_of_measurements_rejected += max_clique_info.second;
+         number_of_measurements_accepted += max_clique_info.first.first;
+         number_of_measurements_rejected += max_clique_info.first.second;
+
+         SaveRejectedKeys(max_clique_info.second);
       }
       total_outliers_rejected_ += number_of_measurements_rejected;
+      std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
+      std::ofstream outliers_rejected_file;
+      outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
+      outliers_rejected_file << number_of_measurements_rejected << "\n" ;
+      outliers_rejected_file.close();
 
       if (debug_level_ >= 1) {
          std::cout << "Robot " << robot_id_ << " Outliers filtering, max clique size=" << number_of_measurements_accepted 
@@ -676,6 +678,11 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
    }
 
 }
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::SaveRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys) {}
 
 /****************************************/
 /****************************************/
