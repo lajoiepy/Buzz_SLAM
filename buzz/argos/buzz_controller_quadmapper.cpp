@@ -243,7 +243,8 @@ void CBuzzControllerQuadMapper::OptimizerTick() {
       case Start :
          if (debug_level_ >= 1){
             std::cout << "Robot " << robot_id_ << " Start Distributed Pose Graph Optimization" << std::endl;
-         }optimizer_state_ = OptimizerState::Initialization;
+         }
+         optimizer_state_ = OptimizerState::Initialization;
          break;
       case Initialization :
          optimizer_state_ = OptimizerState::RotationEstimation;
@@ -499,7 +500,7 @@ void CBuzzControllerQuadMapper::WriteInitialDataset() {
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
    dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_" + std::to_string(number_of_optimization_run_) + ".g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_no_updates.g2o";
+   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_no_filtering.g2o";
    gtsam::writeG2o(*local_pose_graph_no_updates_, *poses_initial_guess_no_updates_, dataset_file_name);
 }
 
@@ -652,17 +653,22 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
          auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
                                  graph_and_values_, robot_local_map_, pose_estimates_from_neighbors_.at(robot),
                                  confidence_probability_, is_prior_added_);
-         if (max_clique_info.first.first < 2) {
-            if (debug_level_ >= 1) {
-               std::cout << "Robot " << robot_id_ << " Outliers filtering, not enough separators accepted : stop estimation" << std::endl;
-            }
-            optimizer_state_ = OptimizerState::Idle;
-         }
          
          number_of_measurements_accepted += max_clique_info.first.first;
          number_of_measurements_rejected += max_clique_info.first.second;
 
          SaveRejectedKeys(max_clique_info.second);
+
+         if (debug_level_ >= 1) {
+            std::cout << "Robot " << robot_id_ << " Outliers filtering, other robot id=" << robot << ", max clique size=" << max_clique_info.first.first 
+                     << ", number of measurements removed=" << max_clique_info.first.second << std::endl;
+         }
+      }
+      if (number_of_measurements_accepted < 2) {
+         if (debug_level_ >= 1) {
+            std::cout << "Robot " << robot_id_ << " Outliers filtering, not enough separators accepted : stop estimation" << std::endl;
+         }
+         optimizer_state_ = OptimizerState::Idle;
       }
       total_outliers_rejected_ += number_of_measurements_rejected;
       std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
@@ -670,11 +676,6 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
       outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
       outliers_rejected_file << number_of_measurements_rejected << "\n" ;
       outliers_rejected_file.close();
-
-      if (debug_level_ >= 1) {
-         std::cout << "Robot " << robot_id_ << " Outliers filtering, max clique size=" << number_of_measurements_accepted 
-                   << ", number of measurements removed=" << number_of_measurements_rejected << std::endl;
-      }
    }
 
 }

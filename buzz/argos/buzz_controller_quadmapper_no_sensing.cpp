@@ -400,7 +400,9 @@ void CBuzzControllerQuadMapperNoSensing::SaveRejectedKeys(const std::set<std::pa
 void CBuzzControllerQuadMapperNoSensing::RemoveRejectedKeys() {
    for (const auto& rejected_pair : rejected_keys_) {
       inliers_keys_.erase(rejected_pair);
+      inliers_keys_.erase(std::make_pair(rejected_pair.second, rejected_pair.first));
       outliers_keys_.erase(rejected_pair);
+      outliers_keys_.erase(std::make_pair(rejected_pair.second, rejected_pair.first));
    }
    rejected_keys_.clear();
 }
@@ -580,7 +582,8 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
                << "\n";
       error_file.close();
 
-      ComputeCentralizedEstimate();
+      ComputeCentralizedEstimate("");
+      ComputeCentralizedEstimate("_no_filtering");
 
       RemoveRejectedKeys();
       return std::abs(std::get<0>(errors) - std::get<1>(errors)) < 0.1;
@@ -594,7 +597,7 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimate() {
+void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimate(const std::string& centralized_extension) {
    // Initialize the set of robots on which to evaluate
    std::set<int> robots;
    for (int i = 0; i < number_of_robots_; i++) {
@@ -607,7 +610,7 @@ void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimate() {
    int number_of_separators = 0;
    int number_of_outliers_not_rejected = 0;
    for (const auto& i : robots) {
-      std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial_no_updates.g2o";
+      std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial" + centralized_extension + ".g2o";
       if (boost::filesystem::exists(dataset_file_name)) {
          gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
          graph_and_values_vec.push_back(graph_and_values);
@@ -616,8 +619,6 @@ void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimate() {
    gtsam::GraphAndValues full_graph_and_values = distributed_mapper::evaluation_utils::readFullGraph(graph_and_values_vec.size(), graph_and_values_vec);
 
    gtsam::noiseModel::Diagonal::shared_ptr evaluation_model = gtsam::noiseModel::Isotropic::Variance(6, 1e-12);
-
-   // TODO : Outliers rejection
 
    std::pair<gtsam::Values, gtsam::Values> estimates = distributed_mapper::evaluation_utils::centralizedEstimates(full_graph_and_values, 
                               evaluation_model,
@@ -646,9 +647,9 @@ void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimate() {
    }
 
    for (const auto& i : robots) {
-      std::string centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized.g2o";
+      std::string centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized" + centralized_extension + ".g2o";
       gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_values_by_robots[i], centralized_file_name);
-      centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized_GN.g2o";
+      centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized_GN" + centralized_extension + ".g2o";
       gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_GN_values_by_robots[i], centralized_file_name);
    }
 

@@ -49,7 +49,7 @@ protected:
 
    virtual bool CompareCentralizedAndDecentralizedError();
 
-   void ComputeCentralizedEstimate();
+   void ComputeCentralizedEstimate(const std::string& centralized_extension);
 
    virtual void WriteInitialDataset();
 
