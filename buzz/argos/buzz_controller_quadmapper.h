@@ -204,6 +204,8 @@ protected:
 
    virtual void SaveRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys);
 
+   void FillPoseGraphForCentralizedEvaluation();
+
 protected:
    // General attributes of the controller
    uint16_t robot_id_;
@@ -214,6 +216,10 @@ protected:
    boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_;
 
    boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_no_updates_;
+
+   boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_for_centralized_evaluation_;
+
+   std::set<std::pair<gtsam::Key, gtsam::Key>> factors_in_pose_graph_for_centralized_evaluation_;
 
    boost::shared_ptr<gtsam::Values> poses_initial_guess_;
 

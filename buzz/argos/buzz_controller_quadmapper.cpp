@@ -31,6 +31,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
    local_pose_graph_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
    local_pose_graph_no_updates_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
+   local_pose_graph_for_centralized_evaluation_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
    poses_initial_guess_ = boost::make_shared< gtsam::Values >();
    poses_initial_guess_->insert(previous_symbol_.key(), gtsam::Pose3());
    poses_initial_guess_no_updates_ = boost::make_shared< gtsam::Values >();
@@ -67,6 +68,10 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
    std::remove(log_file_name.c_str());
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
+   std::remove(log_file_name.c_str());
+   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized.g2o";
+   std::remove(log_file_name.c_str());
+   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
    std::remove(log_file_name.c_str());
 
 
@@ -500,7 +505,9 @@ void CBuzzControllerQuadMapper::WriteInitialDataset() {
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
    dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_" + std::to_string(number_of_optimization_run_) + ".g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_no_filtering.g2o";
+   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized.g2o";
+   gtsam::writeG2o(*local_pose_graph_for_centralized_evaluation_, *poses_initial_guess_no_updates_, dataset_file_name);
+   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
    gtsam::writeG2o(*local_pose_graph_no_updates_, *poses_initial_guess_no_updates_, dataset_file_name);
 }
 
@@ -676,8 +683,31 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
       outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
       outliers_rejected_file << number_of_measurements_rejected << "\n" ;
       outliers_rejected_file.close();
+      FillPoseGraphForCentralizedEvaluation();
+   } else {
+      local_pose_graph_for_centralized_evaluation_ = local_pose_graph_;
    }
 
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::FillPoseGraphForCentralizedEvaluation() {
+   for (const auto& factor_ptr : optimizer_->currentGraph()) {
+      auto edge_ptr = boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3> >(factor_ptr);
+      if (edge_ptr) {
+         int robot_id_1 = (int) (gtsam::Symbol(edge_ptr->key1()).chr() - 97);
+         int robot_id_2 = (int) (gtsam::Symbol(edge_ptr->key2()).chr() - 97);
+         if ((robot_id_1 == robot_id_ || neighbors_within_communication_range_.find(robot_id_1) != neighbors_within_communication_range_.end()) && 
+             (robot_id_2 == robot_id_ || neighbors_within_communication_range_.find(robot_id_2) != neighbors_within_communication_range_.end())) {
+            if (factors_in_pose_graph_for_centralized_evaluation_.find(std::make_pair(edge_ptr->key1(), edge_ptr->key2())) == factors_in_pose_graph_for_centralized_evaluation_.end()) {
+               factors_in_pose_graph_for_centralized_evaluation_.insert(std::make_pair(edge_ptr->key1(), edge_ptr->key2()));
+               local_pose_graph_for_centralized_evaluation_->push_back(edge_ptr);
+            }
+         }
+      }
+   }
 }
 
 /****************************************/
