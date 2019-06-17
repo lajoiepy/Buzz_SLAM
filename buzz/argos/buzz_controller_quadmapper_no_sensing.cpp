@@ -655,5 +655,73 @@ void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimate(const std::s
 
 }
 
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapperNoSensing::AbortOptimization(){
+   CBuzzControllerQuadMapper::AbortOptimization();
+
+   // Initialize the set of robots on which to evaluate
+   std::set<int> robots = neighbors_within_communication_range_;
+   robots.insert(robot_id_);
+
+   auto aggregated_outliers_keys = AggregateOutliersKeys(robots);
+   int number_of_separators = 0;
+   int number_of_outliers_not_rejected = 0;
+   for (const auto& i : robots) {
+      std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial.g2o";
+      if (!boost::filesystem::exists(dataset_file_name)) {
+         return; // File does not exists yet
+      }
+      gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
+      int current_index = 0;
+      for (const auto &factor: *graph_and_values.first) {
+         boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3> > pose3_between = boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3> >(factor);
+         auto robot_1_id = gtsam::Symbol(pose3_between->key1()).chr();
+         auto robot_2_id = gtsam::Symbol(pose3_between->key2()).chr();
+         if (robot_1_id != robot_2_id) {
+            if (robots.find(((int)robot_1_id-97)) != robots.end() && robots.find(((int)robot_2_id-97)) != robots.end()) {
+               number_of_separators++;
+               if (aggregated_outliers_keys.find(std::make_pair(pose3_between->key1(), pose3_between->key2())) != aggregated_outliers_keys.end()) {
+                  number_of_outliers_not_rejected++;
+               }
+            }
+         }
+         current_index++;
+      }
+   }
+
+   // Gather info on outliers rejection
+   double total_number_of_separators_rejected_on_all_robots = 0;
+   for (const auto& i : robots) {
+      std::string separators_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_separators_rejected.g2o";
+      std::ifstream separators_rejected_file(separators_rejected_file_name);
+      int number_of_separators_rejected  = 0;
+      separators_rejected_file >> number_of_separators_rejected;
+      total_number_of_separators_rejected_on_all_robots += number_of_separators_rejected;
+      separators_rejected_file.close();
+   }
+   total_number_of_separators_rejected_on_all_robots /= 2;
+   number_of_separators /= 2;
+   auto inliers_outliers_added = CountInliersAndOutliers(robots);
+
+   // Write results to csv
+   std::ofstream error_file;
+   error_file.open(error_file_name_, std::ios::out | std::ios::app);
+   auto number_of_poses = optimizer_->numberOfPosesInCurrentEstimate();
+   std::string place_holder = "Aborted";
+   error_file << robots.size() << "\t" << number_of_poses << "\t" << place_holder << "\t" << outlier_probability_ << std::boolalpha 
+            << "\t" << incremental_solving_ << "\t" << rotation_noise_std_ << "\t" << translation_noise_std_ 
+            << "\t" << rotation_estimate_change_threshold_ << "\t" << pose_estimate_change_threshold_ 
+            << "\t" << optimizer_period_ << "\t" << confidence_probability_
+            << "\t" << place_holder << "\t" << place_holder << "\t" << place_holder 
+            << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ 
+            << "\t" << inliers_outliers_added.first
+            << "\t" << inliers_outliers_added.second 
+            << "\t" << total_number_of_separators_rejected_on_all_robots 
+            << "\t" << number_of_outliers_not_rejected
+            << "\n";
+   error_file.close();
+}
 
 }

@@ -206,6 +206,10 @@ protected:
 
    void FillPoseGraphForCentralizedEvaluation();
 
+   void SaveBackup();
+
+   virtual void AbortOptimization();
+
 protected:
    // General attributes of the controller
    uint16_t robot_id_;
@@ -290,6 +294,9 @@ protected:
    int number_of_optimization_run_;
 
    int lowest_id_to_include_in_global_map_, lowest_id_included_in_global_map_;
+
+   // Backups in case of abort
+   robot_measurements::RobotLocalMap robot_local_map_backup_;
 
    // Parameters
    double rotation_noise_std_, translation_noise_std_;

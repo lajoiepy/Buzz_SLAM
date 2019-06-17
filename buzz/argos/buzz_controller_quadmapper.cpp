@@ -74,7 +74,6 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
    std::remove(log_file_name.c_str());
 
-
 }
 
 /****************************************/
@@ -214,8 +213,33 @@ void CBuzzControllerQuadMapper::FailSafeCheck() {
       if (debug_level_ >= 1){
          std::cout << "Robot " << robot_id_ << " No progress, Stop optimization" << std::endl;
       }
-      optimizer_state_ = OptimizerState::Idle;
+      AbortOptimization();
    }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::SaveBackup() {
+
+   robot_local_map_backup_ = robot_local_map_;
+
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::AbortOptimization() {
+
+   for (const auto& transform : robot_local_map_backup_.getTransforms().transforms) {
+      if (robot_local_map_.getTransforms().transforms.find(transform.first) == robot_local_map_.getTransforms().transforms.end()) {
+         auto factor = gtsam::BetweenFactor<gtsam::Pose3>(transform.second.i, transform.second.j, transform.second.pose.pose, noise_model_);
+         robot_local_map_.addTransform(factor, transform.second.pose.covariance_matrix);
+         local_pose_graph_->push_back(factor);
+      }
+   }
+
+   optimizer_state_ = OptimizerState::Idle;
 }
 
 /****************************************/
@@ -361,7 +385,7 @@ void CBuzzControllerQuadMapper::RemoveInactiveNeighbors() {
       neighbors_lowest_id_included_in_global_map_.erase(neighbor_id);
    }
    if (neighbors_within_communication_range_.empty()) {
-      optimizer_state_ = OptimizerState::Idle;
+      AbortOptimization();
    }
 }
 
@@ -652,6 +676,7 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
 
 void CBuzzControllerQuadMapper::OutliersFiltering() {
    
+   SaveBackup();
    if (use_pcm_) {
       // Perform pairwise consistency maximization
       int number_of_measurements_accepted = 0;
@@ -671,19 +696,21 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
                      << ", number of measurements removed=" << max_clique_info.first.second << std::endl;
          }
       }
-      if (number_of_measurements_accepted < 2) {
+      if (number_of_measurements_accepted < 4) {
          if (debug_level_ >= 1) {
             std::cout << "Robot " << robot_id_ << " Outliers filtering, not enough separators accepted : stop estimation" << std::endl;
          }
-         optimizer_state_ = OptimizerState::Idle;
+         SaveInitialGraph();
+         AbortOptimization();
+      } else {
+         total_outliers_rejected_ += number_of_measurements_rejected;
+         std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
+         std::ofstream outliers_rejected_file;
+         outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
+         outliers_rejected_file << number_of_measurements_rejected << "\n" ;
+         outliers_rejected_file.close();
+         FillPoseGraphForCentralizedEvaluation();
       }
-      total_outliers_rejected_ += number_of_measurements_rejected;
-      std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
-      std::ofstream outliers_rejected_file;
-      outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
-      outliers_rejected_file << number_of_measurements_rejected << "\n" ;
-      outliers_rejected_file.close();
-      FillPoseGraphForCentralizedEvaluation();
    } else {
       local_pose_graph_for_centralized_evaluation_ = local_pose_graph_;
    }
@@ -874,7 +901,7 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
          if (debug_level_ >= 1) {
             std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
          }
-         optimizer_state_ = OptimizerState::Idle;
+         AbortOptimization();
       }
       is_estimation_done_ = true;
       if (debug_level_ >= 3) {
@@ -888,7 +915,7 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
 
 bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    if (current_rotation_iteration_ > max_number_of_rotation_estimation_steps_) {
-      optimizer_state_ = OptimizerState::Idle;
+      AbortOptimization();
       if (debug_level_ >= 1) {
          std::cout << "Robot " << robot_id_ << " Stop estimation, Maximum number of iteration reached." << std::endl;
       }
@@ -901,7 +928,7 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
       std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
    }
    if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_
-       && current_rotation_iteration_ != 0 && std::abs(change) > 1e-8) {
+       && current_rotation_iteration_ > 2 && std::abs(change) > 1e-8) {
       rotation_estimation_phase_is_finished_ = true;
    }
    return rotation_estimation_phase_is_finished_;
@@ -1051,7 +1078,7 @@ void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
       if (debug_level_ >= 1) {
          std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
       }
-      optimizer_state_ = OptimizerState::Idle;
+      AbortOptimization();
    }
 
    is_estimation_done_ = true;
@@ -1088,7 +1115,7 @@ void CBuzzControllerQuadMapper::NeighborPoseEstimationIsFinished(const int& rid,
 
 bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    if (current_pose_iteration_ > max_number_of_pose_estimation_steps_) {
-      optimizer_state_ = OptimizerState::Idle;
+      AbortOptimization();
       if (debug_level_ >= 1) {
          std::cout << "Robot " << robot_id_ << " Stop estimation, Maximum number of iteration reached." << std::endl;
       }

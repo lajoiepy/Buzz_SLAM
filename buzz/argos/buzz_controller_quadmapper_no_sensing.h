@@ -63,6 +63,8 @@ protected:
 
    void RemoveRejectedKeys();
 
+   virtual void AbortOptimization();
+
 private:
 
    // Ground truth information to compute fake measurements
