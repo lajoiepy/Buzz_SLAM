@@ -564,6 +564,7 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
       total_number_of_separators_rejected_on_all_robots /= 2;
       number_of_separators /= 2;
       auto inliers_outliers_added = CountInliersAndOutliers(robots);
+      number_of_outliers_not_rejected /= 2;
 
       // Write results to csv
       std::ofstream error_file;

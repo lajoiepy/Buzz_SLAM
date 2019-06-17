@@ -880,7 +880,7 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
                optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
             }
          }
-         if (optimizer_state_ == OptimizerState::RotationEstimation) { // && neighbors_within_communication_range_.find(rotation_estimate.sender_robot_id) != neighbors_within_communication_range_.end()
+         if (optimizer_state_ == OptimizerState::RotationEstimation) {
             neighbors_is_estimation_done_[rotation_estimate.sender_robot_id] = rotation_estimate.sender_estimation_is_done;
          }
       }
@@ -1058,7 +1058,7 @@ void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<st
                optimizer_->updateNeighboringRobotInitialized(symbol.chr(), pose_estimate.sender_robot_is_initialized); // Used only with flagged initialization
             }
          }
-         if (optimizer_state_ == OptimizerState::PoseEstimation) { //  && neighbors_within_communication_range_.find(pose_estimate.sender_robot_id) != neighbors_within_communication_range_.end()
+         if (optimizer_state_ == OptimizerState::PoseEstimation) { 
             neighbors_is_estimation_done_[pose_estimate.sender_robot_id] = pose_estimate.sender_estimation_is_done;
          }
       }
