@@ -166,13 +166,15 @@ void CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeOdometryMeasurement() {
    // Save initial guess without update (to compute errors)
    auto new_pose_no_updates = poses_initial_guess_no_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
    poses_initial_guess_no_updates_->insert(current_symbol_.key(), new_pose_no_updates);
+   auto new_pose_incremental = poses_initial_guess_centralized_incremental_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+   poses_initial_guess_centralized_incremental_updates_->insert(current_symbol_.key(), new_pose_incremental);
    
    // Update attributes
    previous_symbol_ = current_symbol_;
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(new_factor);
-   local_pose_graph_no_updates_->push_back(new_factor);
+   local_pose_graph_no_filtering_->push_back(new_factor);
 
    // Add new pose estimate into initial guess
    poses_initial_guess_->insert(current_symbol_.key(), new_pose);
@@ -313,7 +315,7 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(new_factor);
-   local_pose_graph_no_updates_->push_back(new_factor);
+   local_pose_graph_no_filtering_->push_back(new_factor);
 
    // Add transform to local map for pairwise consistency maximization
    robot_local_map_.addTransform(new_factor, covariance_matrix_);
@@ -475,6 +477,10 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
    std::set<int> robots = neighbors_within_communication_range_;
    robots.insert(robot_id_);
 
+   // Compute incremental centralized estimates
+   ComputeCentralizedEstimateIncremental(robots, "");
+   ComputeCentralizedEstimateIncremental(robots, "_no_filtering");
+
    // Collect expected estimate size
    std::string local_dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
    gtsam::GraphAndValues local_graph_and_values = gtsam::readG2o(local_dataset_file_name, true);
@@ -585,8 +591,6 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
 
       ComputeCentralizedEstimate("");
       ComputeCentralizedEstimate("_no_filtering");
-      ComputeCentralizedEstimateIncremental(robots, "");
-      ComputeCentralizedEstimateIncremental(robots, "_no_filtering");
 
       RemoveRejectedKeys();
       return std::abs(std::get<0>(errors) - std::get<1>(errors)) < 0.1;
@@ -662,14 +666,14 @@ void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimateIncremental(s
 
    // Aggregate estimates from all the robots
    std::vector<gtsam::GraphAndValues> graph_and_values_vec;
-   std::string dataset_file_name = "log/datasets/" + std::to_string(prior_owner_) + "_initial_centralized" + centralized_extension + ".g2o";
+   std::string dataset_file_name = "log/datasets/" + std::to_string(prior_owner_) + "_initial_centralized" + centralized_extension + "_incremental.g2o";
    if (boost::filesystem::exists(dataset_file_name)) {
       gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
       graph_and_values_vec.push_back(graph_and_values);
    }
    for (const auto& i : robots) {
       if (i != prior_owner_){
-         dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial_centralized" + centralized_extension + ".g2o";
+         dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial_centralized" + centralized_extension + "_incremental.g2o";
          if (boost::filesystem::exists(dataset_file_name)) {
             gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
             graph_and_values_vec.push_back(graph_and_values);
@@ -751,12 +755,11 @@ void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimateIncremental(s
       }
    }
 
-   for (const auto& i : robots) {
-      std::string centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized" + centralized_extension + "_incremental.g2o";
-      gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_values_by_robots[i], centralized_file_name);
-      centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized_GN" + centralized_extension + "_incremental.g2o";
-      gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_GN_values_by_robots[i], centralized_file_name);
-   }
+   std::string centralized_file_name = "log/datasets/" + std::to_string(robot_id_) + "_centralized" + centralized_extension + "_incremental.g2o";
+   gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_values_by_robots[robot_id_], centralized_file_name);
+   centralized_file_name = "log/datasets/" + std::to_string(robot_id_) + "_centralized_GN" + centralized_extension + "_incremental.g2o";
+   gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_GN_values_by_robots[robot_id_], centralized_file_name);
+   IncrementalInitialGuessUpdate(centralized_values_by_robots[robot_id_], poses_initial_guess_centralized_incremental_updates_);
 
 }
 

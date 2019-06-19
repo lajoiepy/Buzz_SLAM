@@ -210,6 +210,8 @@ protected:
 
    virtual void AbortOptimization(const bool& log_info);
 
+   void IncrementalInitialGuessUpdate(const gtsam::Values& new_poses, boost::shared_ptr<gtsam::Values>& poses_to_be_updated);
+
 protected:
    // General attributes of the controller
    uint16_t robot_id_;
@@ -219,7 +221,7 @@ protected:
    // Measurements
    boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_;
 
-   boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_no_updates_;
+   boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_no_filtering_;
 
    boost::shared_ptr<gtsam::NonlinearFactorGraph> local_pose_graph_for_centralized_evaluation_;
 
@@ -227,7 +229,7 @@ protected:
 
    boost::shared_ptr<gtsam::Values> poses_initial_guess_;
 
-   boost::shared_ptr<gtsam::Values> poses_initial_guess_no_updates_;
+   boost::shared_ptr<gtsam::Values> poses_initial_guess_no_updates_, poses_initial_guess_centralized_incremental_updates_;
 
    gtsam::GraphAndValues graph_and_values_;
 

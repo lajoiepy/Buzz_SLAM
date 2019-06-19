@@ -30,12 +30,14 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    robot_id_char_ = (unsigned char)(97 + robot_id_);
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
    local_pose_graph_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
-   local_pose_graph_no_updates_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
+   local_pose_graph_no_filtering_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
    local_pose_graph_for_centralized_evaluation_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
    poses_initial_guess_ = boost::make_shared< gtsam::Values >();
    poses_initial_guess_->insert(previous_symbol_.key(), gtsam::Pose3());
    poses_initial_guess_no_updates_ = boost::make_shared< gtsam::Values >();
    poses_initial_guess_no_updates_->insert(previous_symbol_.key(), gtsam::Pose3());
+   poses_initial_guess_centralized_incremental_updates_ = boost::make_shared< gtsam::Values >();
+   poses_initial_guess_centralized_incremental_updates_->insert(previous_symbol_.key(), gtsam::Pose3());
    current_rotation_iteration_ = 0;
    current_pose_iteration_ = 0;
    is_estimation_done_ = false;
@@ -72,6 +74,8 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized.g2o";
    std::remove(log_file_name.c_str());
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
+   std::remove(log_file_name.c_str());
+   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
    std::remove(log_file_name.c_str());
 
 }
@@ -496,7 +500,7 @@ void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
    // Factor
    gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_1_symbol, robot_2_symbol, transformation, noise_model_);
    local_pose_graph_->push_back(new_factor);
-   local_pose_graph_no_updates_->push_back(new_factor);
+   local_pose_graph_no_filtering_->push_back(new_factor);
 
    // Add transform to local map for pairwise consistency maximization
    robot_local_map_.addTransform(new_factor, covariance_matrix);
@@ -532,7 +536,11 @@ void CBuzzControllerQuadMapper::WriteInitialDataset() {
    dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized.g2o";
    gtsam::writeG2o(*local_pose_graph_for_centralized_evaluation_, *poses_initial_guess_no_updates_, dataset_file_name);
    dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
-   gtsam::writeG2o(*local_pose_graph_no_updates_, *poses_initial_guess_no_updates_, dataset_file_name);
+   gtsam::writeG2o(*local_pose_graph_no_filtering_, *poses_initial_guess_no_updates_, dataset_file_name);
+   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_incremental.g2o";
+   gtsam::writeG2o(*local_pose_graph_for_centralized_evaluation_, *poses_initial_guess_centralized_incremental_updates_, dataset_file_name);
+   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
+   gtsam::writeG2o(*local_pose_graph_no_filtering_, *poses_initial_guess_centralized_incremental_updates_, dataset_file_name);
 }
 
 
@@ -1194,23 +1202,7 @@ void CBuzzControllerQuadMapper::EndOptimization() {
       optimizer_->retractPose3GlobalWithOffset(neighbors_anchor_offset_[prior_owner_]);
    }
    if (incremental_solving_) {
-      poses_initial_guess_->update(optimizer_->currentEstimate());
-
-      for (auto factor : *local_pose_graph_) {
-         auto between_factor = boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3> >(factor);
-         auto first_key = between_factor->key1();
-         auto second_key = between_factor->key2();
-         if (!optimizer_->currentEstimate().exists(second_key) && gtsam::Symbol(second_key).chr() == robot_id_char_) {
-            // Get previous pose
-            auto previous_pose = poses_initial_guess_->at<gtsam::Pose3>(first_key);
-
-            // Compose previous pose and measurement
-            auto current_pose = previous_pose * between_factor->measured();
-
-            // Update pose in initial guess
-            poses_initial_guess_->update(second_key ,current_pose);
-         }
-      }
+      IncrementalInitialGuessUpdate(optimizer_->currentEstimate(), poses_initial_guess_);
    }
 
    lowest_id_included_in_global_map_ = lowest_id_to_include_in_global_map_;
@@ -1219,6 +1211,29 @@ void CBuzzControllerQuadMapper::EndOptimization() {
    Register("lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
 
    WriteOptimizedDataset();
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::IncrementalInitialGuessUpdate(const gtsam::Values& new_poses, boost::shared_ptr<gtsam::Values>& poses_to_be_updated) {
+   poses_to_be_updated->update(new_poses);
+
+   for (auto factor : *local_pose_graph_) {
+      auto between_factor = boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3> >(factor);
+      auto first_key = between_factor->key1();
+      auto second_key = between_factor->key2();
+      if (!new_poses.exists(second_key) && gtsam::Symbol(second_key).chr() == robot_id_char_) {
+         // Get previous pose
+         auto previous_pose = poses_to_be_updated->at<gtsam::Pose3>(first_key);
+
+         // Compose previous pose and measurement
+         auto current_pose = previous_pose * between_factor->measured();
+
+         // Update pose in initial guess
+         poses_to_be_updated->update(second_key ,current_pose);
+      }
+   }
 }
 
 /****************************************/
