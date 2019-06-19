@@ -208,7 +208,7 @@ protected:
 
    void SaveBackup();
 
-   virtual void AbortOptimization();
+   virtual void AbortOptimization(const bool& log_info);
 
 protected:
    // General attributes of the controller

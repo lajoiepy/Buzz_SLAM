@@ -213,7 +213,7 @@ void CBuzzControllerQuadMapper::FailSafeCheck() {
       if (debug_level_ >= 1){
          std::cout << "Robot " << robot_id_ << " No progress, Stop optimization" << std::endl;
       }
-      AbortOptimization();
+      AbortOptimization(false);
    }
 }
 
@@ -229,7 +229,7 @@ void CBuzzControllerQuadMapper::SaveBackup() {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::AbortOptimization() {
+void CBuzzControllerQuadMapper::AbortOptimization(const bool& log_info) {
 
    for (const auto& transform : robot_local_map_backup_.getTransforms().transforms) {
       if (robot_local_map_.getTransforms().transforms.find(transform.first) == robot_local_map_.getTransforms().transforms.end()) {
@@ -385,7 +385,7 @@ void CBuzzControllerQuadMapper::RemoveInactiveNeighbors() {
       neighbors_lowest_id_included_in_global_map_.erase(neighbor_id);
    }
    if (neighbors_within_communication_range_.empty()) {
-      AbortOptimization();
+      AbortOptimization(false);
    }
 }
 
@@ -701,7 +701,7 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
             std::cout << "Robot " << robot_id_ << " Outliers filtering, not enough separators accepted : stop estimation" << std::endl;
          }
          SaveInitialGraph();
-         AbortOptimization();
+         AbortOptimization(false);
       } else {
          total_outliers_rejected_ += number_of_measurements_rejected;
          std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
@@ -901,7 +901,7 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
          if (debug_level_ >= 1) {
             std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
          }
-         AbortOptimization();
+         AbortOptimization(true);
       }
       is_estimation_done_ = true;
       if (debug_level_ >= 3) {
@@ -915,7 +915,7 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
 
 bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    if (current_rotation_iteration_ > max_number_of_rotation_estimation_steps_) {
-      AbortOptimization();
+      AbortOptimization(true);
       if (debug_level_ >= 1) {
          std::cout << "Robot " << robot_id_ << " Stop estimation, Maximum number of iteration reached." << std::endl;
       }
@@ -1078,7 +1078,7 @@ void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
       if (debug_level_ >= 1) {
          std::cout << "Robot " << robot_id_ << " : " << ex.what() << std::endl << "Stopping optimization." << std::endl;
       }
-      AbortOptimization();
+      AbortOptimization(true);
    }
 
    is_estimation_done_ = true;
@@ -1115,7 +1115,7 @@ void CBuzzControllerQuadMapper::NeighborPoseEstimationIsFinished(const int& rid,
 
 bool CBuzzControllerQuadMapper::PoseEstimationStoppingConditions() {
    if (current_pose_iteration_ > max_number_of_pose_estimation_steps_) {
-      AbortOptimization();
+      AbortOptimization(true);
       if (debug_level_ >= 1) {
          std::cout << "Robot " << robot_id_ << " Stop estimation, Maximum number of iteration reached." << std::endl;
       }

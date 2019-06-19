@@ -63,7 +63,7 @@ protected:
 
    void RemoveRejectedKeys();
 
-   virtual void AbortOptimization();
+   virtual void AbortOptimization(const bool& log_info);
 
 private:
 
