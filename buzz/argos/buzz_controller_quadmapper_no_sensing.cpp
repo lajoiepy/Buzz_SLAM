@@ -585,6 +585,8 @@ bool CBuzzControllerQuadMapperNoSensing::CompareCentralizedAndDecentralizedError
 
       ComputeCentralizedEstimate("");
       ComputeCentralizedEstimate("_no_filtering");
+      ComputeCentralizedEstimateIncremental(robots, "");
+      ComputeCentralizedEstimateIncremental(robots, "_no_filtering");
 
       RemoveRejectedKeys();
       return std::abs(std::get<0>(errors) - std::get<1>(errors)) < 0.1;
@@ -606,10 +608,7 @@ void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimate(const std::s
    }
 
    // Aggregate estimates from all the robots
-   gtsam::Values distributed;
    std::vector<gtsam::GraphAndValues> graph_and_values_vec;
-   int number_of_separators = 0;
-   int number_of_outliers_not_rejected = 0;
    for (const auto& i : robots) {
       std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial_centralized" + centralized_extension + ".g2o";
       if (boost::filesystem::exists(dataset_file_name)) {
@@ -651,6 +650,111 @@ void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimate(const std::s
       std::string centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized" + centralized_extension + ".g2o";
       gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_values_by_robots[i], centralized_file_name);
       centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized_GN" + centralized_extension + ".g2o";
+      gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_GN_values_by_robots[i], centralized_file_name);
+   }
+
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapperNoSensing::ComputeCentralizedEstimateIncremental(std::set<int> robots, const std::string& centralized_extension) {
+
+   // Aggregate estimates from all the robots
+   std::vector<gtsam::GraphAndValues> graph_and_values_vec;
+   std::string dataset_file_name = "log/datasets/" + std::to_string(prior_owner_) + "_initial_centralized" + centralized_extension + ".g2o";
+   if (boost::filesystem::exists(dataset_file_name)) {
+      gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
+      graph_and_values_vec.push_back(graph_and_values);
+   }
+   for (const auto& i : robots) {
+      if (i != prior_owner_){
+         dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial_centralized" + centralized_extension + ".g2o";
+         if (boost::filesystem::exists(dataset_file_name)) {
+            gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
+            graph_and_values_vec.push_back(graph_and_values);
+         }
+      }
+   }
+   gtsam::GraphAndValues full_graph_and_values = distributed_mapper::evaluation_utils::readFullGraph(graph_and_values_vec);
+
+   gtsam::noiseModel::Diagonal::shared_ptr evaluation_model = gtsam::noiseModel::Isotropic::Variance(6, 1e-12);
+
+   std::pair<gtsam::Values, gtsam::Values> estimates = distributed_mapper::evaluation_utils::centralizedEstimates(full_graph_and_values, 
+                              evaluation_model,
+                              chordal_graph_noise_model_,
+                              false);
+
+   // Split estimates
+   std::map<int, gtsam::Values> centralized_values_by_robots;
+   for (const auto& i : robots) {
+      centralized_values_by_robots.insert(std::make_pair(i, gtsam::Values()));
+   }
+
+   // Get anchor offset
+   gtsam::Point3 anchor_offset_translation = gtsam::Point3();
+   gtsam::Rot3 anchor_offset_rotation = gtsam::Rot3();
+   dataset_file_name = "log/datasets/" + std::to_string(prior_owner_) + "_centralized" + centralized_extension + "_incremental.g2o";
+   if (boost::filesystem::exists(dataset_file_name)) {
+      gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
+      gtsam::Key first_key = gtsam::KeyVector(graph_and_values.second->keys()).at(0);
+      anchor_offset_translation = graph_and_values.second->at<gtsam::Pose3>(first_key).translation();
+      anchor_offset_rotation = graph_and_values.second->at<gtsam::Pose3>(first_key).rotation();
+   }
+   for (const gtsam::Values::ConstKeyValuePair &key_value : estimates.first) {
+      int value_robot_id = (int)(gtsam::Symbol(key_value.key).chr() - 97);
+      if (value_robot_id == prior_owner_) {
+         gtsam::Pose3 value = key_value.value.cast<gtsam::Pose3>();
+         anchor_offset_translation = anchor_offset_translation - value.translation();
+         anchor_offset_rotation = anchor_offset_rotation * value.rotation().inverse();
+         break;
+      }
+   }
+   for (const gtsam::Values::ConstKeyValuePair &key_value : estimates.first) {
+      int value_robot_id = (int)(gtsam::Symbol(key_value.key).chr() - 97);
+      if (robots.find(value_robot_id) != robots.end()) {
+         gtsam::Key new_key = gtsam::Symbol(((char) value_robot_id + 97), gtsam::Symbol(key_value.key).index());
+         gtsam::Pose3 value = key_value.value.cast<gtsam::Pose3>();
+         gtsam::Pose3 new_value = gtsam::Pose3(value.rotation(), value.translation() + anchor_offset_translation);
+         new_value = new_value * gtsam::Pose3(anchor_offset_rotation, gtsam::Point3());
+         centralized_values_by_robots[value_robot_id].insert(new_key, new_value);
+      }
+   }
+
+   std::map<int, gtsam::Values> centralized_GN_values_by_robots;
+   for (const auto& i : robots) {
+      centralized_GN_values_by_robots.insert(std::make_pair(i, gtsam::Values()));
+   }
+
+   anchor_offset_translation = gtsam::Point3();
+   dataset_file_name = "log/datasets/" + std::to_string(prior_owner_) + "_centralized_GN" + centralized_extension + "_incremental.g2o";
+   if (boost::filesystem::exists(dataset_file_name)) {
+      gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
+      gtsam::Key first_key = gtsam::KeyVector(graph_and_values.second->keys()).at(0);
+      anchor_offset_translation = graph_and_values.second->at<gtsam::Pose3>(first_key).translation();
+   }
+   for (const gtsam::Values::ConstKeyValuePair &key_value : estimates.second) {
+      int value_robot_id = (int)(gtsam::Symbol(key_value.key).chr() - 97);
+      if (value_robot_id == prior_owner_) {
+         gtsam::Pose3 value = key_value.value.cast<gtsam::Pose3>();
+         anchor_offset_translation = anchor_offset_translation - value.translation();
+         break;
+      }
+   }
+   for (const gtsam::Values::ConstKeyValuePair &key_value : estimates.second) {
+      int value_robot_id = (int)(gtsam::Symbol(key_value.key).chr() - 97);
+      if (robots.find(value_robot_id) != robots.end()) {
+         gtsam::Key new_key = gtsam::Symbol(((char) value_robot_id + 97), gtsam::Symbol(key_value.key).index());
+         gtsam::Pose3 value = key_value.value.cast<gtsam::Pose3>();
+         gtsam::Pose3 new_value = gtsam::Pose3(value.rotation(), value.translation() + anchor_offset_translation);
+         centralized_GN_values_by_robots[value_robot_id].insert(new_key, new_value);
+      }
+   }
+
+   for (const auto& i : robots) {
+      std::string centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized" + centralized_extension + "_incremental.g2o";
+      gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_values_by_robots[i], centralized_file_name);
+      centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized_GN" + centralized_extension + "_incremental.g2o";
       gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_GN_values_by_robots[i], centralized_file_name);
    }
 

@@ -51,6 +51,8 @@ protected:
 
    void ComputeCentralizedEstimate(const std::string& centralized_extension);
 
+   void ComputeCentralizedEstimateIncremental(std::set<int> robots, const std::string& centralized_extension);
+
    virtual void WriteInitialDataset();
 
    virtual void WriteOptimizedDataset();
