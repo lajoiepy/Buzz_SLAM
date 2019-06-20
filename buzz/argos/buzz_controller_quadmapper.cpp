@@ -697,7 +697,7 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
          number_of_measurements_accepted += max_clique_info.first.first;
          number_of_measurements_rejected += max_clique_info.first.second;
 
-         SaveRejectedKeys(max_clique_info.second);
+         SaveAcceptedAndRejectedKeys(max_clique_info.second.first, max_clique_info.second.second);
 
          if (debug_level_ >= 1) {
             std::cout << "Robot " << robot_id_ << " Outliers filtering, other robot id=" << robot << ", max clique size=" << max_clique_info.first.first 
@@ -748,7 +748,19 @@ void CBuzzControllerQuadMapper::FillPoseGraphForCentralizedEvaluation() {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapper::SaveRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys) {}
+void CBuzzControllerQuadMapper::SaveAcceptedAndRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& accepted_keys, const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys) {
+   for (const auto& accepted_pair : accepted_keys) {
+      accepted_keys_.insert(accepted_pair);
+      if (gtsam::Symbol(accepted_pair.first).chr() == robot_id_char_) {
+         other_robot_keys_for_optimization_.insert(accepted_pair.second);
+      } else {
+         other_robot_keys_for_optimization_.insert(accepted_pair.first);
+      }
+   }
+   for (const auto& rejected_pair : rejected_keys) {
+      rejected_keys_.insert(rejected_pair);
+   }
+}
 
 /****************************************/
 /****************************************/
@@ -879,13 +891,19 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
          if (rotation_estimate.receiver_robot_id == robot_id_ &&
             neighbors_within_communication_range_.find(rotation_estimate.sender_robot_id) != neighbors_within_communication_range_.end()) {
             gtsam::Symbol symbol((unsigned char)(rotation_estimate.sender_robot_id+97), rotation_estimate.sender_pose_id);
-            gtsam::Vector rotation_matrix_vector(9);
-            rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
-                                    rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
-                                    rotation_estimate.rotation_matrix[6], rotation_estimate.rotation_matrix[7], rotation_estimate.rotation_matrix[8];
-            optimizer_->updateNeighborLinearizedRotations(symbol.key(), rotation_matrix_vector);
-            if (optimizer_state_ == OptimizerState::RotationEstimation) {
-               optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
+            if (other_robot_keys_for_optimization_.find(symbol.key()) != other_robot_keys_for_optimization_.end()) {
+               gtsam::Vector rotation_matrix_vector(9);
+               rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
+                                       rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
+                                       rotation_estimate.rotation_matrix[6], rotation_estimate.rotation_matrix[7], rotation_estimate.rotation_matrix[8];
+               optimizer_->updateNeighborLinearizedRotations(symbol.key(), rotation_matrix_vector);
+               if (optimizer_state_ == OptimizerState::RotationEstimation) {
+                  optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
+               }
+               std::cout << "Robot " << rotation_estimate.sender_robot_id << " at " << symbol.key() << ". Est[0]=" << rotation_matrix_vector[0] << ", Est[5]=" << rotation_matrix_vector[5] << std::endl;
+               std::cout << "Robot " << rotation_estimate.sender_robot_id << " is init? " << rotation_estimate.sender_robot_is_initialized << std::endl;
+            } else {
+               AbortOptimization(false);
             }
          }
          if (optimizer_state_ == OptimizerState::RotationEstimation) {
@@ -1054,6 +1072,7 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
 
 void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<std::vector<pose_estimate_t>>& pose_estimates_from_all_robot) {
    for (const auto& pose_estimates_from_one_robot : pose_estimates_from_all_robot) {
+      if (pose_estimates_from_one_robot[0].receiver_robot_id == robot_id_) std::cout << "Robot " << robot_id_ << " , from robot " << pose_estimates_from_one_robot[0].sender_robot_id << " : n pose est received= " << pose_estimates_from_one_robot.size() << std::endl;
       for (const auto& pose_estimate : pose_estimates_from_one_robot) {
          if (pose_estimate.receiver_robot_id == robot_id_ &&
             neighbors_within_communication_range_.find(pose_estimate.sender_robot_id) != neighbors_within_communication_range_.end()) {

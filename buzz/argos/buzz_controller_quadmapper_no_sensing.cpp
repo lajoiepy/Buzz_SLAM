@@ -390,15 +390,6 @@ void CBuzzControllerQuadMapperNoSensing::WriteOptimizedDataset() {
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapperNoSensing::SaveRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys) {
-   for (const auto& rejected_pair : rejected_keys) {
-      rejected_keys_.insert(rejected_pair);
-   }
-}
-
-/****************************************/
-/****************************************/
-
 void CBuzzControllerQuadMapperNoSensing::RemoveRejectedKeys() {
    for (const auto& rejected_pair : rejected_keys_) {
       inliers_keys_.erase(rejected_pair);

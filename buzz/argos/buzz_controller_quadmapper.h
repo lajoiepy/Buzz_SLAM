@@ -202,7 +202,7 @@ protected:
 
    void FailSafeCheck();
 
-   virtual void SaveRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys);
+   void SaveAcceptedAndRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& accepted_keys, const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys);
 
    void FillPoseGraphForCentralizedEvaluation();
 
@@ -296,6 +296,10 @@ protected:
    int number_of_optimization_run_;
 
    int lowest_id_to_include_in_global_map_, lowest_id_included_in_global_map_;
+
+   std::set<std::pair<gtsam::Key, gtsam::Key>> accepted_keys_, rejected_keys_;
+
+   std::set<gtsam::Key> other_robot_keys_for_optimization_;
 
    // Backups in case of abort
    robot_measurements::RobotLocalMap robot_local_map_backup_;

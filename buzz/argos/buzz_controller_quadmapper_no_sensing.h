@@ -61,8 +61,6 @@ protected:
 
    std::pair<int, int> CountInliersAndOutliers(const std::set<int>& robots);
 
-   virtual void SaveRejectedKeys(const std::set<std::pair<gtsam::Key, gtsam::Key>>& rejected_keys);
-
    void RemoveRejectedKeys();
 
    virtual void AbortOptimization(const bool& log_info);
@@ -90,7 +88,6 @@ private:
    double sensor_range_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> inliers_keys_;
-   std::set<std::pair<gtsam::Key, gtsam::Key>> rejected_keys_;
 
 };
 }
