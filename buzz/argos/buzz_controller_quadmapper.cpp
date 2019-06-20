@@ -829,17 +829,6 @@ void CBuzzControllerQuadMapper::AddNeighborWithinCommunicationRange(const int& r
 
 void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
 
-   // Mark the robot with the lowest id as initialized
-   if (use_flagged_initialization_ && !optimizer_->isRobotInitialized()) {
-      bool is_initialized = true;
-      for (const auto& neighbor : neighbors_within_communication_range_) {
-         if (neighbor < robot_id_) {
-            is_initialized = false;
-         }
-      }
-      optimizer_->updateInitialized(is_initialized);
-   }
-
    // Create empty data table
    buzzobj_t b_rotation_estimates = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
 
@@ -900,8 +889,6 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
                if (optimizer_state_ == OptimizerState::RotationEstimation) {
                   optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
                }
-               std::cout << "Robot " << rotation_estimate.sender_robot_id << " at " << symbol.key() << ". Est[0]=" << rotation_matrix_vector[0] << ", Est[5]=" << rotation_matrix_vector[5] << std::endl;
-               std::cout << "Robot " << rotation_estimate.sender_robot_id << " is init? " << rotation_estimate.sender_robot_is_initialized << std::endl;
             } else {
                AbortOptimization(false);
             }
@@ -1012,17 +999,6 @@ void CBuzzControllerQuadMapper::InitializePoseEstimation() {
 
 void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& rid) {
 
-   // Mark the robot with the lowest id as initialized
-   if (use_flagged_initialization_ && !optimizer_->isRobotInitialized()) {
-      bool is_initialized = true;
-      for (const auto& neighbor : neighbors_within_communication_range_) {
-         if (neighbor < robot_id_) {
-            is_initialized = false;
-         }
-      }
-      optimizer_->updateInitialized(is_initialized);
-   }
-
    // Create empty data table
    buzzobj_t b_pose_estimates = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
 
@@ -1072,7 +1048,6 @@ void CBuzzControllerQuadMapper::ComputeAndUpdatePoseEstimatesToSend(const int& r
 
 void CBuzzControllerQuadMapper::UpdateNeighborPoseEstimates(const std::vector<std::vector<pose_estimate_t>>& pose_estimates_from_all_robot) {
    for (const auto& pose_estimates_from_one_robot : pose_estimates_from_all_robot) {
-      if (pose_estimates_from_one_robot[0].receiver_robot_id == robot_id_) std::cout << "Robot " << robot_id_ << " , from robot " << pose_estimates_from_one_robot[0].sender_robot_id << " : n pose est received= " << pose_estimates_from_one_robot.size() << std::endl;
       for (const auto& pose_estimate : pose_estimates_from_one_robot) {
          if (pose_estimate.receiver_robot_id == robot_id_ &&
             neighbors_within_communication_range_.find(pose_estimate.sender_robot_id) != neighbors_within_communication_range_.end()) {
