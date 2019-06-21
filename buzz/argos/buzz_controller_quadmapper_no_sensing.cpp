@@ -817,7 +817,7 @@ void CBuzzControllerQuadMapperNoSensing::AbortOptimization(const bool& log_info)
                << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ 
                << "\t" << inliers_outliers_added.first
                << "\t" << inliers_outliers_added.second 
-               << "\t" << total_number_of_separators_rejected_on_all_robots 
+               << "\t" << std::round(total_number_of_separators_rejected_on_all_robots) 
                << "\t" << number_of_outliers_not_rejected
                << "\n";
       error_file.close();
