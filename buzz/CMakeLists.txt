@@ -46,11 +46,14 @@ message("Boost Libraries: ${Boost_LIBRARIES}")
 #
 set(ARGOS_BUZZ_SOURCES
   argos/buzz_controller_quadmapper.h      
-  argos/buzz_controller_quadmapper.cpp
-  argos/buzz_controller_quadmapper_no_sensing.h      
-  argos/buzz_controller_quadmapper_no_sensing.cpp     
+  argos/buzz_controller_quadmapper.cpp     
   argos/buzz_closures_quadmapper.cpp     
-  argos/buzz_closures_quadmapper_no_sensing.cpp)
+  argos/simulation_random_walk/buzz_controller_quadmapper_no_sensing.h      
+  argos/simulation_random_walk/buzz_controller_quadmapper_no_sensing.cpp
+  argos/simulation_random_walk/buzz_closures_quadmapper_no_sensing.cpp     
+  argos/simulation_dataset/buzz_controller_quadmapper_with_dataset.h      
+  argos/simulation_dataset/buzz_controller_quadmapper_with_dataset.cpp
+  argos/simulation_dataset/buzz_closures_quadmapper_with_dataset.cpp)
 
 add_library(argos3plugin_simulator_buzz_slam SHARED ${ARGOS_BUZZ_SOURCES})
 target_link_libraries(argos3plugin_simulator_buzz_slam
