@@ -39,13 +39,7 @@ void CBuzzControllerQuadMapperWithDataset::Init(TConfigurationNode& t_node){
    uniform_distribution_outliers_translation_ = std::uniform_real_distribution<>{0, sensor_range_};
    uniform_distribution_outliers_rotation_ = std::uniform_real_distribution<>{-M_PI, M_PI};
    uniform_distribution_draw_outlier_ = std::uniform_real_distribution<>{0, 1};
-   simulation_step_ = 0;
-   previous_simulation_gt_pose_ = m_pcPos->GetReading();
-
-   // Save ground truth for fake separator creation
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
-   ground_truth_data_ = boost::make_shared< gtsam::Values >();
-   SavePoseGroundTruth();
 
    // Initialize covariance matrix
    covariance_matrix_ = gtsam::Matrix6::Zero();
@@ -74,136 +68,125 @@ void CBuzzControllerQuadMapperWithDataset::Init(TConfigurationNode& t_node){
    std::remove(log_file_name.c_str());
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_reference_frame.g2o";
    std::remove(log_file_name.c_str());
-}
 
-/****************************************/
-/****************************************/
+   // Read .g2o dataset file
+   std::string dataset_file_name = "datasets/" + dataset_name_ + "/" + std::to_string(robot_id_) + ".g2o";
+   auto dataset_graph_and_values = gtsam::readG2o(dataset_file_name, true);
 
-void CBuzzControllerQuadMapperWithDataset::LoadParameters(const double& sensor_range, const double& outlier_probability) {
-   sensor_range_ = sensor_range;
-   outlier_probability_ = outlier_probability;
-}
+   // Fill values with odometry starting from ground truth position
+   CQuaternion initial_orientation_reading = m_pcPos->GetReading().Orientation;
+   auto initial_orientation = gtsam::Rot3(initial_orientation_reading.GetW(),initial_orientation_reading.GetX(),initial_orientation_reading.GetY(),initial_orientation_reading.GetZ());
+   CVector3 initial_translation_reading = m_pcPos->GetReading().Position;
+   auto initial_translation = gtsam::Point3(initial_translation_reading.GetX(), initial_translation_reading.GetY(), initial_translation_reading.GetZ());
+   auto current_pose = gtsam::Pose3(initial_orientation, initial_translation);
+   auto current_key = gtsam::Symbol(robot_id_char_, 0).key();
+   dataset_graph_and_values.second->insert(current_key, current_pose);
 
-/****************************************/
-/****************************************/
-
-int CBuzzControllerQuadMapperWithDataset::MoveForwardFakeOdometry(const CVector3& distance, const int& simulation_time_divider) {
-   simulation_step_ ++;
-
-   // Move
-   CQuaternion current_orientation = m_pcPos->GetReading().Orientation;
-   CRadians c_z_angle, c_y_angle, c_x_angle;
-   current_orientation.ToEulerAngles(c_z_angle, c_y_angle, c_x_angle);
-
-   CVector3 translation;
-   translation.SetX(distance.GetX()*std::cos(c_z_angle.GetValue()));
-   translation.SetY(distance.GetX()*std::sin(c_z_angle.GetValue()));
-   translation.SetZ(0);
-
-   CVector3 new_position;
-   new_position.SetX(m_pcPos->GetReading().Position.GetX() + translation.GetX());
-   new_position.SetY(m_pcPos->GetReading().Position.GetY() + translation.GetY());
-
-   new_position.SetZ(2.0f); // To ensure that the quadrotor flies
-
-   m_pcPropellers->SetAbsolutePosition(new_position);
-   
-   if (simulation_step_ % simulation_time_divider == 0) {
-      // Add noisy measurement
-      ComputeNoisyFakeOdometryMeasurement();
-
-      // Log data
-      //WriteCurrentDataset();   
+   for (auto factor : *dataset_graph_and_values.first) {
+      auto between_factor = boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3>>(factor);
+      auto first_key = between_factor->key1();
+      auto first_symbol = gtsam::Symbol(first_key);
+      auto second_key = between_factor->key2();
+      auto second_symbol = gtsam::Symbol(second_key);
+      dataset_factors_.insert(std::make_pair(std::make_pair(first_key, second_key), between_factor));
+      if (first_symbol.chr() == robot_id_char_ && second_symbol.chr() == robot_id_char_) {
+         if (first_key == current_key) {
+            // Measurement
+            gtsam::Pose3 measurement(between_factor->measured().rotation(), 
+                        gtsam::Point3(between_factor->measured().x()/10, between_factor->measured().y()/10, between_factor->measured().z()/10));
+            // Compose previous pose and measurement
+            current_pose = current_pose * measurement;
+            // Add pose
+            dataset_graph_and_values.second->insert(second_key, current_pose);
+         } else {
+            // Find first pose
+            current_pose = dataset_graph_and_values.second->at<gtsam::Pose3>(first_key);
+            // Measurement
+            gtsam::Pose3 measurement(between_factor->measured().rotation(), 
+                        gtsam::Point3(between_factor->measured().x()/10, between_factor->measured().y()/10, between_factor->measured().z()/10));
+            // Compose previous pose and measurement
+            current_pose = current_pose * measurement;
+            // Add pose
+            dataset_graph_and_values.second->insert(second_key, current_pose);
+         }
+      } else {
+         if (first_symbol.chr() == robot_id_char_ && first_symbol.index() > second_symbol.index()) {
+            loop_closure_linked_to_key_.insert(std::make_pair(first_key, std::make_pair(first_key, second_key)));
+         } else if (second_symbol.chr() == robot_id_char_ && second_symbol.index() > first_symbol.index()) {
+            loop_closure_linked_to_key_.insert(std::make_pair(second_key, std::make_pair(first_key, second_key)));
+         }
+      }
    }
 
+   dataset_values_ = dataset_graph_and_values.second;
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapperWithDataset::LoadParameters(const std::string& dataset_name, const double& sensor_range, const double& outlier_probability) {
+   sensor_range_ = sensor_range;
+   outlier_probability_ = outlier_probability;
+   dataset_name_ = dataset_name;
+}
+
+/****************************************/
+/****************************************/
+
+int CBuzzControllerQuadMapperWithDataset::Move() {
+   auto symbol = gtsam::Symbol(robot_id_char_, number_of_poses_);
+   if (dataset_values_->exists(symbol.key())) {
+      auto pose = dataset_values_->at<gtsam::Pose3>(symbol.key());
+      CVector3 position(pose.x(), pose.y(), pose.z());
+      m_pcPropellers->SetAbsolutePosition(position);
+      m_pcPropellers->SetAbsoluteYaw(CRadians(pose.rotation().yaw()));
+
+      // Add measurement
+      AddOdometryMeasurement();
+   }
    return number_of_poses_;
 }
 
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapperWithDataset::ComputeNoisyFakeOdometryMeasurement() {
+void CBuzzControllerQuadMapperWithDataset::AddOdometryMeasurement() {
    
-   // Extract info
-   CQuaternion previous_orientation = previous_simulation_gt_pose_.Orientation;
-   CQuaternion current_orientation = m_pcPos->GetReading().Orientation;
-   CVector3 previous_position = previous_simulation_gt_pose_.Position;
-   CVector3 current_position = m_pcPos->GetReading().Position;
-
    // Increase the number of poses
    IncrementNumberOfPoses();
 
    // Next symbol
-   gtsam::Symbol current_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
-
-   // Conversion of the previous orientation (quaternion to rotation matrix)
-   gtsam::Quaternion previous_quat_gtsam(previous_orientation.GetW(), previous_orientation.GetX(), previous_orientation.GetY(), previous_orientation.GetZ());
-   gtsam::Rot3 previous_R(previous_quat_gtsam);
-   
-   // Conversion of the current orientation (quaternion to rotation matrix)
-   gtsam::Quaternion current_quat_gtsam(current_orientation.GetW(), current_orientation.GetX(), current_orientation.GetY(), current_orientation.GetZ());
-   gtsam::Rot3 current_R(current_quat_gtsam);
-
-   // Compute transformation between rotations
-   gtsam::Rot3 R = previous_R.inverse() * current_R;
-
-   // Convert translation information to gtsam format and perform the appropriate rotation
-   gtsam::Point3 t = {  current_position.GetX() - previous_position.GetX(), 
-                        current_position.GetY() - previous_position.GetY(),
-                        current_position.GetZ() - previous_position.GetZ()};
-   t = previous_R.inverse() * t;
-
-   // Add gaussian noise
-   auto measurement = AddGaussianNoiseToMeasurement(R, t);
+   gtsam::Symbol current_symbol = gtsam::Symbol(robot_id_char_, number_of_poses_);
 
    // Initialize factor
-   gtsam::BetweenFactor<gtsam::Pose3> new_factor(previous_symbol_, current_symbol_, measurement, noise_model_);
+   if (dataset_factors_.count(std::make_pair(previous_symbol_, current_symbol)) != 0) {
+      auto new_factor = dataset_factors_.at(std::make_pair(previous_symbol_, current_symbol));
 
-   // Update attributes value
-   previous_simulation_gt_pose_ = m_pcPos->GetReading();
-   auto new_pose = poses_initial_guess_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+      // Add gaussian noise
+      auto measurement = new_factor->measured();
 
-   // Save initial guess without update (to compute errors)
-   auto new_pose_no_updates = poses_initial_guess_no_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
-   poses_initial_guess_no_updates_->insert(current_symbol_.key(), new_pose_no_updates);
-   auto new_pose_incremental = poses_initial_guess_centralized_incremental_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
-   poses_initial_guess_centralized_incremental_updates_->insert(current_symbol_.key(), new_pose_incremental);
-   
-   // Update attributes
-   previous_symbol_ = current_symbol_;
+      // Update attributes
+      auto new_pose = poses_initial_guess_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+      auto new_pose_no_updates = poses_initial_guess_no_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+      poses_initial_guess_no_updates_->insert(current_symbol.key(), new_pose_no_updates);
+      auto new_pose_incremental = poses_initial_guess_centralized_incremental_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+      poses_initial_guess_centralized_incremental_updates_->insert(current_symbol.key(), new_pose_incremental);
+      
+      // Update attributes
+      previous_symbol_ = current_symbol;
 
-   // Add new factor to local pose graph
-   local_pose_graph_->push_back(new_factor);
-   local_pose_graph_no_filtering_->push_back(new_factor);
+      // Add new factor to local pose graph
+      local_pose_graph_->push_back(new_factor);
+      local_pose_graph_no_filtering_->push_back(new_factor);
 
-   // Add new pose estimate into initial guess
-   poses_initial_guess_->insert(current_symbol_.key(), new_pose);
+      // Add new pose estimate into initial guess
+      poses_initial_guess_->insert(current_symbol.key(), new_pose);
 
-   // Add transform to local map for pairwise consistency maximization
-   robot_local_map_.addTransform(new_factor, covariance_matrix_);
-
-   // Save ground truth for fake separator creation
-   SavePoseGroundTruth();
-}
-
-/****************************************/
-/****************************************/
-
-gtsam::Pose3 CBuzzControllerQuadMapperWithDataset::AddGaussianNoiseToMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t) {
-   
-   gtsam::Point3 t_noisy = {  t.x() + normal_distribution_translation_(gen_translation_),  
-                              t.y() + normal_distribution_translation_(gen_translation_),
-                              t.z() + normal_distribution_translation_(gen_translation_) };
-   
-   gtsam::Point3 R_noise_vector = { normal_distribution_rotation_(gen_rotation_),  
-                                    normal_distribution_rotation_(gen_rotation_),
-                                    normal_distribution_rotation_(gen_rotation_) };
-
-   gtsam::Rot3 R_noise_matrix = gtsam::Rot3::AxisAngle(R_noise_vector.normalized(), R_noise_vector.norm());
-
-   gtsam::Rot3 R_noisy = R * R_noise_matrix;
-
-   return gtsam::Pose3(R_noisy, t_noisy);
+      // Add transform to local map for pairwise consistency maximization
+      robot_local_map_.addTransform(*new_factor, covariance_matrix_);
+   } else {
+      number_of_poses_ --;
+   }
 }
 
 /****************************************/
@@ -230,126 +213,56 @@ gtsam::Pose3 CBuzzControllerQuadMapperWithDataset::OutlierMeasurement(const gtsa
 /****************************************/
 /****************************************/
 
-int CBuzzControllerQuadMapperWithDataset::ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
-                                                               const int& other_robot_pose_id, const int& other_robot_id, const int& this_robot_pose_id) {
-   // Separator symbols
-   gtsam::Symbol this_robot_symbol = gtsam::Symbol(robot_id_char_, this_robot_pose_id);
-   unsigned char other_robot_id_char = (unsigned char)(97 + other_robot_id);
-   gtsam::Symbol other_robot_symbol = gtsam::Symbol(other_robot_id_char, other_robot_pose_id);
-   AddNewKnownRobot(other_robot_symbol.chr());
+int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurement() {
+   if (loop_closure_linked_to_key_.count(previous_symbol_.key()) == 0) {
+      return -1;
+   }
+   // Separator symbol
+   auto loop_closure_keys = loop_closure_linked_to_key_.at(previous_symbol_.key());
 
-   // Get this robot pose
-   gtsam::Pose3 this_robot_pose = ground_truth_poses_.find(this_robot_pose_id)->second;
+   AddNewKnownRobot(gtsam::Symbol(loop_closure_keys.first).chr());
+   AddNewKnownRobot(gtsam::Symbol(loop_closure_keys.second).chr());
 
-   // Conversion of the other robot orientation (quaternion to rotation matrix)
-   gtsam::Quaternion other_robot_quat_gtsam(gt_orientation.GetW(), gt_orientation.GetX(), gt_orientation.GetY(), gt_orientation.GetZ());
-   gtsam::Rot3 other_robot_R(other_robot_quat_gtsam);
-
-   // Compute transformation between rotations
-   gtsam::Rot3 R = this_robot_pose.rotation().inverse() * other_robot_R;
-
-   // Convert translation information to gtsam format and perform the appropriate rotation
-   gtsam::Point3 t = { gt_translation.GetX() - this_robot_pose.translation().x(), 
-                       gt_translation.GetY() - this_robot_pose.translation().y(),
-                       gt_translation.GetZ() - this_robot_pose.translation().z() };
-   t = this_robot_pose.rotation().inverse() * t;
-
-   // Add gaussian noise or make it an outlier
-   gtsam::Pose3 measurement;
+   // Get factor or make it an outlier
+   boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>> new_factor = dataset_factors_.at(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
+   gtsam::Pose3 measurement = new_factor->measured();
    int is_outlier = 0;
    if ( uniform_distribution_draw_outlier_(gen_outliers_) < outlier_probability_) {
-      measurement = OutlierMeasurement(R, t);
+      measurement = OutlierMeasurement(measurement.rotation(), measurement.translation());
+      new_factor.reset();
+      new_factor = boost::make_shared<gtsam::BetweenFactor<gtsam::Pose3>>(gtsam::Symbol(loop_closure_keys.first), gtsam::Symbol(loop_closure_keys.second), measurement, noise_model_);
       is_outlier = 1;
    } else {
-      measurement = AddGaussianNoiseToMeasurement(R, t);
       number_of_inliers_added_++;
    }
 
-   // Initialize factor
-   // Enforce an order for separator measurement. (lower_id, higher_id).
-   gtsam::BetweenFactor<gtsam::Pose3> new_factor;
-   if (other_robot_symbol.chr() > this_robot_symbol.chr()) {
-      new_factor = gtsam::BetweenFactor<gtsam::Pose3>(this_robot_symbol, other_robot_symbol, measurement, noise_model_);
+   UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
+                                          (int)(gtsam::Symbol(loop_closure_keys.second).chr() - 97),
+                                          gtsam::Symbol(loop_closure_keys.first).index(),
+                                          gtsam::Symbol(loop_closure_keys.second).index(),
+                                          measurement.x(),
+                                          measurement.y(),
+                                          measurement.z(),
+                                          measurement.rotation().quaternion()[1],
+                                          measurement.rotation().quaternion()[2],
+                                          measurement.rotation().quaternion()[3],
+                                          measurement.rotation().quaternion()[0],
+                                          covariance_matrix_ );
 
-      UpdateCurrentSeparatorBuzzStructure( this->GetBuzzVM()->robot,
-                                             other_robot_id,
-                                             this_robot_pose_id,
-                                             other_robot_pose_id,
-                                             measurement.x(),
-                                             measurement.y(),
-                                             measurement.z(),
-                                             measurement.rotation().quaternion()[1],
-                                             measurement.rotation().quaternion()[2],
-                                             measurement.rotation().quaternion()[3],
-                                             measurement.rotation().quaternion()[0],
-                                             covariance_matrix_ );
-
-      if (is_outlier) {
-         outliers_keys_.insert(std::make_pair(this_robot_symbol.key(), other_robot_symbol.key()));
-      } else {
-         inliers_keys_.insert(std::make_pair(this_robot_symbol.key(), other_robot_symbol.key()));
-      }
-   } else {      
-      measurement = measurement.inverse();
-      new_factor = gtsam::BetweenFactor<gtsam::Pose3>(other_robot_symbol, this_robot_symbol, measurement, noise_model_);
-
-      UpdateCurrentSeparatorBuzzStructure( other_robot_id,
-                                             this->GetBuzzVM()->robot,
-                                             other_robot_pose_id,
-                                             this_robot_pose_id,
-                                             -measurement.x(),
-                                             -measurement.y(),
-                                             measurement.z(),
-                                             measurement.rotation().quaternion()[1],
-                                             measurement.rotation().quaternion()[2],
-                                             measurement.rotation().quaternion()[3],
-                                             measurement.rotation().quaternion()[0],
-                                             covariance_matrix_ );
-
-      if (is_outlier) {
-         outliers_keys_.insert(std::make_pair(other_robot_symbol.key(), this_robot_symbol.key()));
-      } else {
-         inliers_keys_.insert(std::make_pair(other_robot_symbol.key(), this_robot_symbol.key()));
-      }
-   }   
+   if (is_outlier) {
+      outliers_keys_.insert(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
+   } else {
+      inliers_keys_.insert(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
+   }
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(new_factor);
    local_pose_graph_no_filtering_->push_back(new_factor);
 
    // Add transform to local map for pairwise consistency maximization
-   robot_local_map_.addTransform(new_factor, covariance_matrix_);
+   robot_local_map_.addTransform(*new_factor, covariance_matrix_);
 
    return is_outlier;
-}
-
-/****************************************/
-/****************************************/
-
-void CBuzzControllerQuadMapperWithDataset::SavePoseGroundTruth(){
-   gtsam::Point3 t_gt = {  m_pcPos->GetReading().Position.GetX(), 
-                           m_pcPos->GetReading().Position.GetY(),
-                           m_pcPos->GetReading().Position.GetZ() };
-   
-   CQuaternion current_orientation = m_pcPos->GetReading().Orientation;
-   gtsam::Quaternion current_quat_gtsam(current_orientation.GetW(), current_orientation.GetX(), current_orientation.GetY(), current_orientation.GetZ());
-   gtsam::Rot3 R_gt(current_quat_gtsam);
-
-   gtsam::Pose3 pose_gt(R_gt, t_gt);
-   ground_truth_poses_.insert(std::make_pair(number_of_poses_, pose_gt));   
-
-
-   ground_truth_data_->insert(previous_symbol_.key(), pose_gt);
-}
-
-/****************************************/
-/****************************************/
-
-void CBuzzControllerQuadMapperWithDataset::WriteInitialDataset() {
-   CBuzzControllerQuadMapper::WriteInitialDataset();
-   // Write ground truth
-   std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_gt.g2o";
-   gtsam::writeG2o(gtsam::NonlinearFactorGraph(), *ground_truth_data_, dataset_file_name);
 }
 
 /****************************************/

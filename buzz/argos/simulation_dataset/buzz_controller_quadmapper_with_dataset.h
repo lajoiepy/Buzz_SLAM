@@ -22,24 +22,19 @@ public:
    virtual void Init(TConfigurationNode& t_node);
 
    // Control functions
-   int MoveForwardFakeOdometry(const CVector3& distance, const int& simulation_time_divider);
+   int Move();
 
    // Fake measurements generation
-   int ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
-                                          const int& pose_id, const int& robot_id, const int& this_robot_pose_id);
+   int AddSeparatorMeasurement();
 
-   void LoadParameters(const double& sensor_range, const double& outlier_probability);
+   void LoadParameters(const std::string& dataset_name, const double& sensor_range, const double& outlier_probability);
 
 private:
 
    // Fake measurements generation
-   void ComputeNoisyFakeOdometryMeasurement();
-
-   gtsam::Pose3 AddGaussianNoiseToMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t);
+   void AddOdometryMeasurement();
 
    gtsam::Pose3 OutlierMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t);
-
-   void SavePoseGroundTruth();
 
 protected:
 
@@ -51,8 +46,6 @@ protected:
    void ComputeCentralizedEstimate(const std::string& centralized_extension);
 
    void ComputeCentralizedEstimateIncremental(std::set<int> robots, const std::string& centralized_extension);
-
-   virtual void WriteInitialDataset();
 
    virtual void WriteOptimizedDataset();
 
@@ -66,10 +59,11 @@ protected:
 
 private:
 
-   // Ground truth information to compute fake measurements
-   std::map<int, gtsam::Pose3> ground_truth_poses_;
-   boost::shared_ptr<gtsam::Values> ground_truth_data_;
-   argos::CCI_PositioningSensor::SReading previous_simulation_gt_pose_;
+   // Information from the dataset
+   std::string dataset_name_;
+   boost::shared_ptr<gtsam::Values> dataset_values_;
+   std::map<std::pair<gtsam::Key, gtsam::Key>, boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>>> dataset_factors_;
+   std::map<gtsam::Key, std::pair<gtsam::Key, gtsam::Key>> loop_closure_linked_to_key_;
 
    // Random numbers generation
    std::random_device rd_{};
@@ -80,7 +74,6 @@ private:
                                     uniform_distribution_draw_outlier_;
 
    // Current state of the simulation
-   int simulation_step_;
    int number_of_outliers_added_;
    int number_of_inliers_added_;
    double outlier_probability_;
