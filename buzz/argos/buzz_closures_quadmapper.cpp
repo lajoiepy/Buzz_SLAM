@@ -944,6 +944,64 @@ static int BuzzUpdateHasSentStartOptimizationFlag(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
+static int BuzzUpdateAdjacencyVector(buzzvm_t vm) {
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateAdjacencyVector();
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzReceiveAdjacencyVectorFromNeighbor(buzzvm_t vm) {
+   buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
+   
+   buzzobj_t buzz_rid = buzzvm_stack_at(vm, 2);
+   int rid;
+   buzzobj_t buzz_adjacency_vector = buzzvm_stack_at(vm, 1);
+   std::vector<int> adjacency_vector;
+
+   if(buzz_rid->o.type == BUZZTYPE_INT &&
+      buzz_adjacency_vector->o.type == BUZZTYPE_TABLE) {
+      rid = buzz_rid->i.value;
+
+      int table_size = buzzdict_size(buzz_adjacency_vector->t.value);
+      int elem;
+      for (int32_t i = 0; i < table_size; ++i) {
+         buzzvm_dup(vm);
+         buzzvm_pushi(vm, i);
+         buzzvm_tget(vm);
+         buzzvm_type_assert(vm, 1, BUZZTYPE_INT);
+         buzzobj_t b_adjacency_value = buzzvm_stack_at(vm, 1);
+         buzzvm_pop(vm);
+         elem = b_adjacency_value->i.value;
+         adjacency_vector.emplace_back(elem);
+      }
+
+   } 
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "BuzzNeighborPoseEstimationIsFinished: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[buzz_rid->o.type]
+         );
+      return vm->state;
+   } 
+
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->ReceiveAdjacencyVectorFromNeighbor(rid, adjacency_vector);
+
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
+/****************************************/
+
 static int BuzzUpdateNeighborHasStartedOptimizationFlag(buzzvm_t vm) {
 
 
@@ -1077,6 +1135,14 @@ buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_has_sent_start_optimization_flag", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateHasSentStartOptimizationFlag));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_adjacency_vector", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateAdjacencyVector));
+   buzzvm_gstore(m_tBuzzVM);
+
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "receive_adjacency_vector_from_neighbor", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzReceiveAdjacencyVectorFromNeighbor));
    buzzvm_gstore(m_tBuzzVM);
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_has_started_optimization_flag", 1));

@@ -53,6 +53,7 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    b_lowest_id_included_in_global_map->i.value = lowest_id_included_in_global_map_;
    Register("lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
    anchor_offset_ = gtsam::Point3();
+   adjacency_matrix_ = gtsam::zeros(number_of_robots_, number_of_robots_);
 
    // Isotropic noise models
    Eigen::VectorXd sigmas(6);
@@ -77,7 +78,6 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    std::remove(log_file_name.c_str());
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
    std::remove(log_file_name.c_str());
-
 }
 
 /****************************************/
@@ -403,24 +403,20 @@ OptimizerPhase CBuzzControllerQuadMapper::GetOptimizerPhase() {
       }
       return OptimizerPhase::Communication;
    }
-   // Smallest ID not done -> estimation
-   bool smallest_id_not_done = true;
-   for (const auto& neighbor_lowest_id : neighbors_lowest_id_included_in_global_map_) {
-      if (neighbors_within_communication_range_.find(neighbor_lowest_id.first) != neighbors_within_communication_range_.end()) {
-         if (neighbor_lowest_id.second < lowest_id_included_in_global_map_) {
-            if (!neighbors_is_estimation_done_[neighbor_lowest_id.first] && neighbors_state_[neighbor_lowest_id.first] <= optimizer_state_) {
-               smallest_id_not_done = false;
-            }
-         }
-         if (neighbor_lowest_id.second == lowest_id_included_in_global_map_) {
-            if ((robot_id_ > neighbor_lowest_id.first && !neighbors_is_estimation_done_[neighbor_lowest_id.first]) && neighbors_state_[neighbor_lowest_id.first] <= optimizer_state_) {
-               smallest_id_not_done = false;
-            }
+   // Follow optimization order
+   bool next_robot_to_estimate = true;
+   for (const auto& robot : optimization_order_) {
+      if (robot == robot_id_) {
+         break;
+      }
+      if (neighbors_within_communication_range_.find(robot) != neighbors_within_communication_range_.end()) {
+         if (!neighbors_is_estimation_done_[robot] && neighbors_state_[robot] <= optimizer_state_) {
+            next_robot_to_estimate = false;
          }
       }
    }
    auto phase = OptimizerPhase::Communication;
-   if (smallest_id_not_done && !neighbors_is_estimation_done_.empty()) {
+   if (next_robot_to_estimate && !neighbors_is_estimation_done_.empty()) {
       phase = OptimizerPhase::Estimation;
    }
    if (debug_level_ >= 3) {
@@ -504,6 +500,10 @@ void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
 
    // Add transform to local map for pairwise consistency maximization
    robot_local_map_.addTransform(new_factor, covariance_matrix);
+
+   // Add info for flagged initialization
+   IncrementNumberOfSeparatorsWithOtherRobot(robot_1_id);
+   IncrementNumberOfSeparatorsWithOtherRobot(robot_2_id);
 }
 
 /****************************************/
@@ -600,13 +600,15 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
 
 void CBuzzControllerQuadMapper::InitializePoseGraphOptimization() {
    
-   //RemoveDisconnectedNeighbors();
+   // RemoveDisconnectedNeighbors();
 
    UpdateOptimizer();
 
    OutliersFiltering();
    
    SaveInitialGraph();
+
+   ComputeOptimizationOrder();
 
    optimizer_->updateInitialized(false);
    optimizer_->clearNeighboringRobotInit();
@@ -1227,6 +1229,82 @@ void CBuzzControllerQuadMapper::IncrementalInitialGuessUpdate(const gtsam::Value
          // Update pose in initial guess
          poses_to_be_updated->update(second_key ,current_pose);
       }
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::IncrementNumberOfSeparatorsWithOtherRobot(const int& other_robot_id) {
+   if (other_robot_id != robot_id_) {
+      if (number_of_separators_with_each_robot_.count(other_robot_id) == 0) {
+         number_of_separators_with_each_robot_.insert(std::make_pair(other_robot_id, 1));
+      } else {
+         number_of_separators_with_each_robot_[other_robot_id] = number_of_separators_with_each_robot_[other_robot_id] + 1;
+      }
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::UpdateAdjacencyVector() {
+   buzzobj_t b_adjacency_vector = buzzheap_newobj(m_tBuzzVM, BUZZTYPE_TABLE);
+   for (int i = 0; i < number_of_robots_; i++) {
+      if (number_of_separators_with_each_robot_.count(i) == 0) {
+         TablePut(b_adjacency_vector, i, 0);         
+      } else {
+         TablePut(b_adjacency_vector, i, number_of_separators_with_each_robot_[i]);
+         adjacency_matrix_(robot_id_, i) = number_of_separators_with_each_robot_[i];
+      }
+   }
+   Register("adjacency_vector", b_adjacency_vector);
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::ReceiveAdjacencyVectorFromNeighbor(const int& other_robot_id, const std::vector<int>& adjacency_vector) {
+   for (int i = 0; i < adjacency_vector.size(); i++) {
+      adjacency_matrix_(other_robot_id, i) = adjacency_vector[i];
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapper::ComputeOptimizationOrder() {
+   optimization_order_.clear();
+   optimization_order_.emplace_back(prior_owner_);
+   std::map<int, int> number_of_edges_by_robots;
+   while (true) {
+      number_of_edges_by_robots.clear();
+      for(const auto& robot_i : neighbors_within_communication_range_){
+         if(std::find(optimization_order_.begin(), optimization_order_.end(), robot_i) == optimization_order_.end()){
+            // for each robot not in the ordering, compute the number of edges
+            // towards robots inside the ordering and select the one with the largest number
+            int number_of_edges_robot_i = 0;
+            for(size_t robot_j: optimization_order_){
+               number_of_edges_robot_i += adjacency_matrix_(robot_i, robot_j);
+            }
+            if(number_of_edges_robot_i != 0){
+               number_of_edges_by_robots.insert(std::make_pair(robot_i, number_of_edges_robot_i));
+            }
+         }
+      }
+      if (number_of_edges_by_robots.empty()) {
+         break;
+      }
+      int maximum_number_of_edges = -1;
+      int maximum_robot_id = -1;
+      for(const auto& robot_i_info : number_of_edges_by_robots){
+         if (robot_i_info.second > maximum_number_of_edges) {
+            maximum_number_of_edges = robot_i_info.second;
+            maximum_robot_id = robot_i_info.first;
+         }
+      }
+      optimization_order_.emplace_back(maximum_robot_id);
+      number_of_edges_by_robots.erase(maximum_robot_id);
    }
 }
 

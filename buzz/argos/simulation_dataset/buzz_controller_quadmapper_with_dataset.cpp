@@ -262,6 +262,10 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurement() {
    // Add transform to local map for pairwise consistency maximization
    robot_local_map_.addTransform(*new_factor, covariance_matrix_);
 
+   // Add info for flagged initialization
+   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.first).chr() - 97);
+   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
+
    return is_outlier;
 }
 

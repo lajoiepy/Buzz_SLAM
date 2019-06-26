@@ -136,6 +136,10 @@ public:
 
    void UpdateHasSentStartOptimizationFlag(const bool& has_sent_start_optimization_flag);
 
+   void UpdateAdjacencyVector();
+
+   void ReceiveAdjacencyVectorFromNeighbor(const int& other_robot_id, const std::vector<int>& adjacency_vector);
+
 protected:
 
    // Functions for link with buzz VM
@@ -212,6 +216,10 @@ protected:
 
    void IncrementalInitialGuessUpdate(const gtsam::Values& new_poses, boost::shared_ptr<gtsam::Values>& poses_to_be_updated);
 
+   void IncrementNumberOfSeparatorsWithOtherRobot(const int& other_robot_id);
+
+   void ComputeOptimizationOrder();
+
 protected:
    // General attributes of the controller
    uint16_t robot_id_;
@@ -277,6 +285,8 @@ protected:
 
    std::map<int, graph_utils::Trajectory> pose_estimates_from_neighbors_;
 
+   std::map<int, int> number_of_separators_with_each_robot_;
+
    bool is_prior_added_;
 
    int total_outliers_rejected_;
@@ -284,8 +294,6 @@ protected:
    bool has_sent_start_optimization_flag_;
 
    std::map<int, bool> neighbors_has_started_optimization_;
-
-   int previous_neighbor_id_in_optimization_order_;
 
    double latest_change_;
 
@@ -300,6 +308,10 @@ protected:
    std::set<std::pair<gtsam::Key, gtsam::Key>> accepted_keys_, rejected_keys_;
 
    std::set<gtsam::Key> other_robot_keys_for_optimization_;
+
+   gtsam::Matrix adjacency_matrix_;
+
+   std::vector<int> optimization_order_;
 
    // Backups in case of abort
    robot_measurements::RobotLocalMap robot_local_map_backup_;
@@ -325,14 +337,14 @@ protected:
 
    int max_number_of_rotation_estimation_steps_, max_number_of_pose_estimation_steps_;
 
+   int number_of_robots_;
+
    // Pairwise consistency maximization parameters
    double confidence_probability_;
 
    bool use_pcm_;
 
    // Parameter for evaluation
-   int number_of_robots_;
-
    bool is_simulation_;
 
    std::string error_file_name_;

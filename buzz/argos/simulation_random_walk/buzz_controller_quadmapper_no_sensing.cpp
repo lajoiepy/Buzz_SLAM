@@ -320,6 +320,9 @@ int CBuzzControllerQuadMapperNoSensing::ComputeNoisyFakeSeparatorMeasurement(con
    // Add transform to local map for pairwise consistency maximization
    robot_local_map_.addTransform(new_factor, covariance_matrix_);
 
+   // Add info for flagged initialization
+   IncrementNumberOfSeparatorsWithOtherRobot(other_robot_id);
+
    return is_outlier;
 }
 
