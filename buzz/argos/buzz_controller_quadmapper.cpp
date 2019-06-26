@@ -868,7 +868,6 @@ void CBuzzControllerQuadMapper::ComputeAndUpdateRotationEstimatesToSend(const in
       }
 
    }
-
    // Register positioning data table as a global symbol
    Register("rotation_estimates_to_send", b_rotation_estimates);
 }
@@ -887,6 +886,9 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
                rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
                                        rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
                                        rotation_estimate.rotation_matrix[6], rotation_estimate.rotation_matrix[7], rotation_estimate.rotation_matrix[8];
+
+               std::cout << "Robot " << rotation_estimate.sender_robot_id << " at " << symbol.key() << ". Est[0]=" << rotation_matrix_vector << std::endl;
+               std::cout << "Robot " << rotation_estimate.sender_robot_id << " is init? " << rotation_estimate.sender_robot_is_initialized << std::endl;
                optimizer_->updateNeighborLinearizedRotations(symbol.key(), rotation_matrix_vector);
                if (optimizer_state_ == OptimizerState::RotationEstimation) {
                   optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
@@ -919,9 +921,9 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
          AbortOptimization(true);
       }
       is_estimation_done_ = true;
-      if (debug_level_ >= 3) {
+      //if (debug_level_ >= 3) {
          std::cout << "Robot " << robot_id_ << " Rotation estimation" << std::endl;
-      }
+      //}
    }
 }
 
@@ -942,8 +944,8 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    if (debug_level_ >= 2) {
       std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
    }
-   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_
-       && current_rotation_iteration_ > 2 && std::abs(change) > 1e-8) {
+   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_ //&& current_rotation_iteration_ > 2
+        && std::abs(change) > 1e-8) {
       rotation_estimation_phase_is_finished_ = true;
    }
    return rotation_estimation_phase_is_finished_;
@@ -1086,9 +1088,9 @@ void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
    }
 
    is_estimation_done_ = true;
-   if (debug_level_ >= 3) {
+   //if (debug_level_ >= 3) {
       std::cout << "Robot " << robot_id_ << " Pose estimation" << std::endl;
-   }
+   //}
 }
 
 /****************************************/
@@ -1277,9 +1279,11 @@ void CBuzzControllerQuadMapper::ComputeOptimizationOrder() {
    optimization_order_.clear();
    optimization_order_.emplace_back(prior_owner_);
    std::map<int, int> number_of_edges_by_robots;
+   auto robots_to_consider = neighbors_within_communication_range_;
+   robots_to_consider.insert(robot_id_);
    while (true) {
       number_of_edges_by_robots.clear();
-      for(const auto& robot_i : neighbors_within_communication_range_){
+      for(const auto& robot_i : robots_to_consider){
          if(std::find(optimization_order_.begin(), optimization_order_.end(), robot_i) == optimization_order_.end()){
             // for each robot not in the ordering, compute the number of edges
             // towards robots inside the ordering and select the one with the largest number
