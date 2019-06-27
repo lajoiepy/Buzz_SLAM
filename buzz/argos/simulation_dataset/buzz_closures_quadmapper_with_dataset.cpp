@@ -11,8 +11,22 @@ static int BuzzAddSeparator(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   int is_outlier = reinterpret_cast<CBuzzControllerQuadMapperWithDataset*>(buzzvm_stack_at(vm, 1)->u.value)->AddSeparatorMeasurement();
-   buzzvm_pushi(vm, is_outlier);
+   int is_added = reinterpret_cast<CBuzzControllerQuadMapperWithDataset*>(buzzvm_stack_at(vm, 1)->u.value)->AddSeparatorMeasurement();
+   buzzvm_pushi(vm, is_added);
+
+   return buzzvm_ret1(vm);
+}
+
+/****************************************/
+/****************************************/
+
+static int BuzzAddSeparatorOutlier(buzzvm_t vm) {
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   int is_added = reinterpret_cast<CBuzzControllerQuadMapperWithDataset*>(buzzvm_stack_at(vm, 1)->u.value)->AddSeparatorMeasurementOutlier();
+   buzzvm_pushi(vm, is_added);
 
    return buzzvm_ret1(vm);
 }
@@ -42,11 +56,11 @@ static int BuzzLoadDatasetParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 3);
    /* Create a new vector with that */
    float sensor_range;
-   float outlier_probability;
+   int outlier_period;
    std::string dataset_name;
    buzzobj_t b_dataset_name = buzzvm_stack_at(vm, 3);
    buzzobj_t b_sensor_range = buzzvm_stack_at(vm, 2);
-   buzzobj_t b_outlier_probability = buzzvm_stack_at(vm, 1);
+   buzzobj_t b_outlier_period = buzzvm_stack_at(vm, 1);
    if(b_dataset_name->o.type == BUZZTYPE_STRING) dataset_name = b_dataset_name->s.value.str;
    else {
       buzzvm_seterror(vm,
@@ -67,13 +81,13 @@ static int BuzzLoadDatasetParameters(buzzvm_t vm) {
          );
       return vm->state;
    }   
-   if(b_outlier_probability->o.type == BUZZTYPE_FLOAT) outlier_probability = b_outlier_probability->f.value;
+   if(b_outlier_period->o.type == BUZZTYPE_INT) outlier_period = b_outlier_period->i.value;
    else {
       buzzvm_seterror(vm,
                       BUZZVM_ERROR_TYPE,
                       "load_no_sensing_parameters: expected %s, got %s in second argument",
                       buzztype_desc[BUZZTYPE_INT],
-                      buzztype_desc[b_outlier_probability->o.type]
+                      buzztype_desc[b_outlier_period->o.type]
          );
       return vm->state;
    }    
@@ -81,7 +95,7 @@ static int BuzzLoadDatasetParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapperWithDataset*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(dataset_name, sensor_range, outlier_probability);
+   reinterpret_cast<CBuzzControllerQuadMapperWithDataset*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(dataset_name, sensor_range, outlier_period);
    
    return buzzvm_ret0(vm);
 }
@@ -96,6 +110,9 @@ buzzvm_state CBuzzControllerQuadMapperWithDataset::RegisterFunctions() {
    /* Register mapping without sensing specific functions */
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "add_separator", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzAddSeparator));
+   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "add_separator_outlier", 1));
+   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzAddSeparatorOutlier));
    buzzvm_gstore(m_tBuzzVM);
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "move", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzMove));

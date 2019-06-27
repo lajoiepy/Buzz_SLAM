@@ -55,7 +55,7 @@ void CBuzzControllerQuadMapperWithDataset::Init(TConfigurationNode& t_node){
       // Write results to csv
       std::ofstream error_file;
       error_file.open(error_file_name_, std::ios::out | std::ios::app);
-      error_file << "NumberOfRobots\tNumberOfPoses\tNumberOfSeparators\tProbabilityOfOutliers\tUsesIncrementalSolving"
+      error_file << "NumberOfRobots\tNumberOfPoses\tNumberOfSeparators\tOutlierPeriod\tUsesIncrementalSolving"
          "\tRotationNoiseStd\tTranslationNoiseStd\tRotationChangeThreshold\tPoseChangeThreshold"
          "\tOptimizerPeriod\tChiSquaredProbability"
          "\tErrorCentralized\tErrorDecentralized\tErrorInitial\tNumberOfRotationIterations\tNumberOfPoseIterations"
@@ -111,9 +111,13 @@ void CBuzzControllerQuadMapperWithDataset::Init(TConfigurationNode& t_node){
          }
       } else {
          if (first_symbol.chr() == robot_id_char_ && first_symbol.index() > second_symbol.index()) {
-            loop_closure_linked_to_key_.insert(std::make_pair(first_key, std::make_pair(first_key, second_key)));
+            if (loop_closure_linked_to_key_.count(first_key) == 0) {
+               loop_closure_linked_to_key_.insert(std::make_pair(first_key, std::make_pair(first_key, second_key)));
+            }
          } else if (second_symbol.chr() == robot_id_char_ && second_symbol.index() > first_symbol.index()) {
-            loop_closure_linked_to_key_.insert(std::make_pair(second_key, std::make_pair(first_key, second_key)));
+            if (loop_closure_linked_to_key_.count(second_key) == 0) {
+               loop_closure_linked_to_key_.insert(std::make_pair(second_key, std::make_pair(first_key, second_key)));
+            }
          }
       }
    }
@@ -124,10 +128,10 @@ void CBuzzControllerQuadMapperWithDataset::Init(TConfigurationNode& t_node){
 /****************************************/
 /****************************************/
 
-void CBuzzControllerQuadMapperWithDataset::LoadParameters(const std::string& dataset_name, const double& sensor_range, const double& outlier_probability) {
+void CBuzzControllerQuadMapperWithDataset::LoadParameters(const std::string& dataset_name, const double& sensor_range, const int& outlier_period) {
    sensor_range_ = sensor_range;
-   outlier_probability_ = outlier_probability;
    dataset_name_ = dataset_name;
+   outlier_period_ = outlier_period;
 }
 
 /****************************************/
@@ -137,7 +141,7 @@ int CBuzzControllerQuadMapperWithDataset::Move() {
    auto symbol = gtsam::Symbol(robot_id_char_, number_of_poses_);
    if (dataset_values_->exists(symbol.key())) {
       auto pose = dataset_values_->at<gtsam::Pose3>(symbol.key());
-      CVector3 position(pose.x(), pose.y(), pose.z());
+      CVector3 position(pose.x(), pose.y(), 2.0f); // Fixed altitude for visualization only
       m_pcPropellers->SetAbsolutePosition(position);
       m_pcPropellers->SetAbsoluteYaw(CRadians(pose.rotation().yaw()));
 
@@ -215,9 +219,9 @@ gtsam::Pose3 CBuzzControllerQuadMapperWithDataset::OutlierMeasurement(const gtsa
 
 int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurement() {
    if (loop_closure_linked_to_key_.count(previous_symbol_.key()) == 0) {
-      return -1;
+      return 0;
    }
-   // Separator symbol
+   // Separator symbols
    auto loop_closure_keys = loop_closure_linked_to_key_.at(previous_symbol_.key());
 
    AddNewKnownRobot(gtsam::Symbol(loop_closure_keys.first).chr());
@@ -226,15 +230,7 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurement() {
    // Get factor or make it an outlier
    boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>> new_factor = dataset_factors_.at(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
    gtsam::Pose3 measurement = new_factor->measured();
-   int is_outlier = 0;
-   if ( uniform_distribution_draw_outlier_(gen_outliers_) < outlier_probability_) {
-      measurement = OutlierMeasurement(measurement.rotation(), measurement.translation());
-      new_factor.reset();
-      new_factor = boost::make_shared<gtsam::BetweenFactor<gtsam::Pose3>>(gtsam::Symbol(loop_closure_keys.first), gtsam::Symbol(loop_closure_keys.second), measurement, noise_model_);
-      is_outlier = 1;
-   } else {
-      number_of_inliers_added_++;
-   }
+   number_of_inliers_added_++;
 
    UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
                                           (int)(gtsam::Symbol(loop_closure_keys.second).chr() - 97),
@@ -249,11 +245,7 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurement() {
                                           measurement.rotation().quaternion()[0],
                                           covariance_matrix_ );
 
-   if (is_outlier) {
-      outliers_keys_.insert(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
-   } else {
-      inliers_keys_.insert(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
-   }
+   inliers_keys_.insert(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(new_factor);
@@ -265,8 +257,86 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurement() {
    // Add info for flagged initialization
    IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.first).chr() - 97);
    IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
+   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.first).chr() - 97);
+   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
 
-   return is_outlier;
+   return 1;
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapperWithDataset::IncrementNumberOfOutliersWithOtherRobot(const int& other_robot_id) {
+   if (other_robot_id != robot_id_) {
+      if (number_of_outliers_with_each_robot_.count(other_robot_id) == 0) {
+         number_of_outliers_with_each_robot_.insert(std::make_pair(other_robot_id, 1));
+      } else {
+         number_of_outliers_with_each_robot_[other_robot_id] = number_of_outliers_with_each_robot_[other_robot_id] + 1;
+      }
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void CBuzzControllerQuadMapperWithDataset::IncrementNumberOfInliersWithOtherRobot(const int& other_robot_id) {
+   if (other_robot_id != robot_id_) {
+      if (number_of_inliers_with_each_robot_.count(other_robot_id) == 0) {
+         number_of_inliers_with_each_robot_.insert(std::make_pair(other_robot_id, 1));
+      } else {
+         number_of_inliers_with_each_robot_[other_robot_id] = number_of_inliers_with_each_robot_[other_robot_id] + 1;
+      }
+   }
+}
+
+/****************************************/
+/****************************************/
+
+int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurementOutlier() {
+   // Separator symbols
+   if (known_other_robots_.empty()){
+      return 0;
+   }
+   auto random_id = std::floor(uniform_distribution_draw_outlier_(gen_outliers_) * number_of_robots_);
+   while (random_id == robot_id_ || known_other_robots_.find((char) random_id + 97) == known_other_robots_.end()) {
+      random_id = std::floor(uniform_distribution_draw_outlier_(gen_outliers_) * number_of_robots_);
+   }
+   if (number_of_inliers_with_each_robot_[random_id] <= number_of_outliers_with_each_robot_[random_id] + 1) {
+      return 0;
+   }
+   auto random_index1 = std::floor(uniform_distribution_draw_outlier_(gen_outliers_) * (number_of_poses_-1) + 1);
+   auto random_index2 = std::floor(uniform_distribution_draw_outlier_(gen_outliers_) * (number_of_poses_-1) + 1);
+   auto loop_closure_keys = std::make_pair(gtsam::Symbol(robot_id_char_, random_index1), gtsam::Symbol((char)(random_id + 97), random_index2));
+
+   // Get an outlier
+   gtsam::Pose3 measurement = OutlierMeasurement(gtsam::Rot3(), gtsam::Point3());
+   boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>> new_factor = boost::make_shared<gtsam::BetweenFactor<gtsam::Pose3>>(gtsam::Symbol(loop_closure_keys.first), gtsam::Symbol(loop_closure_keys.second), measurement, noise_model_);
+
+   UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
+                                          (int)(gtsam::Symbol(loop_closure_keys.second).chr() - 97),
+                                          gtsam::Symbol(loop_closure_keys.first).index(),
+                                          gtsam::Symbol(loop_closure_keys.second).index(),
+                                          measurement.x(),
+                                          measurement.y(),
+                                          measurement.z(),
+                                          measurement.rotation().quaternion()[1],
+                                          measurement.rotation().quaternion()[2],
+                                          measurement.rotation().quaternion()[3],
+                                          measurement.rotation().quaternion()[0],
+                                          covariance_matrix_ );
+
+   outliers_keys_.insert(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
+
+   // Add new factor to local pose graph
+   local_pose_graph_->push_back(new_factor);
+   local_pose_graph_no_filtering_->push_back(new_factor);
+
+   // Add transform to local map for pairwise consistency maximization
+   robot_local_map_.addTransform(*new_factor, covariance_matrix_);
+
+   // Add info for flagged initialization
+   IncrementNumberOfOutliersWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
+   return 1;
 }
 
 /****************************************/
@@ -484,7 +554,7 @@ bool CBuzzControllerQuadMapperWithDataset::CompareCentralizedAndDecentralizedErr
       std::ofstream error_file;
       error_file.open(error_file_name_, std::ios::out | std::ios::app);
       auto number_of_poses = optimizer_->numberOfPosesInCurrentEstimate();
-      error_file << robots.size() << "\t" << number_of_poses << "\t" << number_of_separators << "\t" << outlier_probability_ << std::boolalpha 
+      error_file << robots.size() << "\t" << number_of_poses << "\t" << number_of_separators << "\t" << outlier_period_ << std::boolalpha 
                << "\t" << incremental_solving_ << "\t" << rotation_noise_std_ << "\t" << translation_noise_std_ 
                << "\t" << rotation_estimate_change_threshold_ << "\t" << pose_estimate_change_threshold_ 
                << "\t" << optimizer_period_ << "\t" << confidence_probability_
@@ -726,7 +796,7 @@ void CBuzzControllerQuadMapperWithDataset::AbortOptimization(const bool& log_inf
       error_file.open(error_file_name_, std::ios::out | std::ios::app);
       auto number_of_poses = optimizer_->numberOfPosesInCurrentEstimate();
       std::string place_holder = "Aborted";
-      error_file << robots.size() << "\t" << number_of_poses << "\t" << place_holder << "\t" << outlier_probability_ << std::boolalpha 
+      error_file << robots.size() << "\t" << number_of_poses << "\t" << place_holder << "\t" << outlier_period_ << std::boolalpha 
                << "\t" << incremental_solving_ << "\t" << rotation_noise_std_ << "\t" << translation_noise_std_ 
                << "\t" << rotation_estimate_change_threshold_ << "\t" << pose_estimate_change_threshold_ 
                << "\t" << optimizer_period_ << "\t" << confidence_probability_

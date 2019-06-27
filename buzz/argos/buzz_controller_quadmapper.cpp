@@ -886,9 +886,6 @@ void CBuzzControllerQuadMapper::UpdateNeighborRotationEstimates(const std::vecto
                rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
                                        rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
                                        rotation_estimate.rotation_matrix[6], rotation_estimate.rotation_matrix[7], rotation_estimate.rotation_matrix[8];
-
-               std::cout << "Robot " << rotation_estimate.sender_robot_id << " at " << symbol.key() << ". Est[0]=" << rotation_matrix_vector << std::endl;
-               std::cout << "Robot " << rotation_estimate.sender_robot_id << " is init? " << rotation_estimate.sender_robot_is_initialized << std::endl;
                optimizer_->updateNeighborLinearizedRotations(symbol.key(), rotation_matrix_vector);
                if (optimizer_state_ == OptimizerState::RotationEstimation) {
                   optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
@@ -921,9 +918,9 @@ void CBuzzControllerQuadMapper::EstimateRotationAndUpdateRotation(){
          AbortOptimization(true);
       }
       is_estimation_done_ = true;
-      //if (debug_level_ >= 3) {
+      if (debug_level_ >= 3) {
          std::cout << "Robot " << robot_id_ << " Rotation estimation" << std::endl;
-      //}
+      }
    }
 }
 
@@ -944,8 +941,10 @@ bool CBuzzControllerQuadMapper::RotationEstimationStoppingConditions() {
    if (debug_level_ >= 2) {
       std::cout << "[optimize rotation] Change (Robot " << robot_id_ << "): " << change << std::endl;
    }
-   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) && change < rotation_estimate_change_threshold_ //&& current_rotation_iteration_ > 2
-        && std::abs(change) > 1e-8) {
+   if((!use_flagged_initialization_ || AllRobotsAreInitialized()) 
+      && change < rotation_estimate_change_threshold_ 
+      && current_rotation_iteration_ > 2
+      && std::abs(change) > 1e-8) {
       rotation_estimation_phase_is_finished_ = true;
    }
    return rotation_estimation_phase_is_finished_;
@@ -1088,9 +1087,9 @@ void CBuzzControllerQuadMapper::EstimatePoseAndUpdatePose(){
    }
 
    is_estimation_done_ = true;
-   //if (debug_level_ >= 3) {
+   if (debug_level_ >= 3) {
       std::cout << "Robot " << robot_id_ << " Pose estimation" << std::endl;
-   //}
+   }
 }
 
 /****************************************/

@@ -27,7 +27,9 @@ public:
    // Fake measurements generation
    int AddSeparatorMeasurement();
 
-   void LoadParameters(const std::string& dataset_name, const double& sensor_range, const double& outlier_probability);
+   int AddSeparatorMeasurementOutlier();
+
+   void LoadParameters(const std::string& dataset_name, const double& sensor_range, const int& outlier_period);
 
 private:
 
@@ -35,6 +37,10 @@ private:
    void AddOdometryMeasurement();
 
    gtsam::Pose3 OutlierMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t);
+
+   void IncrementNumberOfInliersWithOtherRobot(const int& other_robot_id);
+
+   void IncrementNumberOfOutliersWithOtherRobot(const int& other_robot_id);
 
 protected:
 
@@ -76,8 +82,9 @@ private:
    // Current state of the simulation
    int number_of_outliers_added_;
    int number_of_inliers_added_;
-   double outlier_probability_;
    double sensor_range_;
+   int outlier_period_;
+   std::map<int, int> number_of_inliers_with_each_robot_, number_of_outliers_with_each_robot_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> inliers_keys_;
 
