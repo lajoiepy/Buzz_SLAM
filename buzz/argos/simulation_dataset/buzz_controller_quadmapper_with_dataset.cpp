@@ -121,6 +121,7 @@ void CBuzzControllerQuadMapperWithDataset::Init(TConfigurationNode& t_node){
          }
       }
    }
+   dataset_reading_ended_ = false;
 
    dataset_values_ = dataset_graph_and_values.second;
 }
@@ -190,6 +191,7 @@ void CBuzzControllerQuadMapperWithDataset::AddOdometryMeasurement() {
       robot_local_map_.addTransform(*new_factor, covariance_matrix_);
    } else {
       number_of_poses_ --;
+      dataset_reading_ended_ = true;
    }
 }
 
@@ -294,7 +296,7 @@ void CBuzzControllerQuadMapperWithDataset::IncrementNumberOfInliersWithOtherRobo
 
 int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurementOutlier() {
    // Separator symbols
-   if (known_other_robots_.empty()){
+   if (known_other_robots_.empty() || dataset_reading_ended_){
       return 0;
    }
    auto random_id = std::floor(uniform_distribution_draw_outlier_(gen_outliers_) * number_of_robots_);

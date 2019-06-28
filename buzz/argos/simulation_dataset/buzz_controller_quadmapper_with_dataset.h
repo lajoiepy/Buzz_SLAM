@@ -87,6 +87,7 @@ private:
    std::map<int, int> number_of_inliers_with_each_robot_, number_of_outliers_with_each_robot_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> inliers_keys_;
+   bool dataset_reading_ended_;
 
 };
 }
