@@ -47,6 +47,8 @@ protected:
    // Functions for link with buzz VM
    virtual buzzvm_state RegisterFunctions();
 
+   virtual void InitializePoseGraphOptimization();
+   
    virtual bool CompareCentralizedAndDecentralizedError();
 
    void ComputeCentralizedEstimate(const std::string& centralized_extension);

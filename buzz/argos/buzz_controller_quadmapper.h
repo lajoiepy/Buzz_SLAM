@@ -170,7 +170,7 @@ protected:
 
    bool StartOptimizationCondition();
 
-   void InitializePoseGraphOptimization();
+   virtual void InitializePoseGraphOptimization();
 
    void UpdateOptimizer();
 

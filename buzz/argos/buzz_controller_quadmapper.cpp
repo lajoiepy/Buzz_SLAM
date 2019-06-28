@@ -600,8 +600,6 @@ void CBuzzControllerQuadMapper::InitOptimizer(const int& period) {
 
 void CBuzzControllerQuadMapper::InitializePoseGraphOptimization() {
    
-   // RemoveDisconnectedNeighbors();
-
    UpdateOptimizer();
 
    OutliersFiltering();
