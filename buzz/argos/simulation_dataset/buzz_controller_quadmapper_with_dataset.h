@@ -70,6 +70,8 @@ private:
    boost::shared_ptr<gtsam::Values> dataset_values_;
    std::map<std::pair<gtsam::Key, gtsam::Key>, boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>>> dataset_factors_;
    std::map<gtsam::Key, std::pair<gtsam::Key, gtsam::Key>> loop_closure_linked_to_key_;
+   gtsam::noiseModel::Isotropic::shared_ptr chordal_graph_noise_model_;
+   gtsam::Matrix covariance_matrix_for_outlier_;
 
    // Random numbers generation
    std::random_device rd_{};

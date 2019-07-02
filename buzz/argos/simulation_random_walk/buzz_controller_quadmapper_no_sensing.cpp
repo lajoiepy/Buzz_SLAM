@@ -56,6 +56,13 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    covariance_matrix_(4,4) = std::pow(translation_noise_std_, 2);
    covariance_matrix_(5,5) = std::pow(translation_noise_std_, 2);
 
+   // Isotropic noise models
+   Eigen::VectorXd sigmas(6);
+   sigmas << rotation_noise_std_, rotation_noise_std_, rotation_noise_std_, 
+            translation_noise_std_, translation_noise_std_, translation_noise_std_;
+   noise_model_ = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
+   chordal_graph_noise_model_ = gtsam::noiseModel::Isotropic::Variance(12, 1);
+
    // Initialize log files
    if (is_simulation_ && robot_id_ ==  0 && !boost::filesystem::exists(error_file_name_)) {
       // Write results to csv

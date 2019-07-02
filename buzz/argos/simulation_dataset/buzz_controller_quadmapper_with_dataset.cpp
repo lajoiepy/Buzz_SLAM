@@ -41,14 +41,8 @@ void CBuzzControllerQuadMapperWithDataset::Init(TConfigurationNode& t_node){
    uniform_distribution_draw_outlier_ = std::uniform_real_distribution<>{0, 1};
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
 
-   // Initialize covariance matrix
-   covariance_matrix_ = gtsam::Matrix6::Zero();
-   covariance_matrix_(0,0) = std::pow(rotation_noise_std_, 2);
-   covariance_matrix_(1,1) = std::pow(rotation_noise_std_, 2);
-   covariance_matrix_(2,2) = std::pow(rotation_noise_std_, 2);
-   covariance_matrix_(3,3) = std::pow(translation_noise_std_, 2);
-   covariance_matrix_(4,4) = std::pow(translation_noise_std_, 2);
-   covariance_matrix_(5,5) = std::pow(translation_noise_std_, 2);
+   // Isotropic noise models
+   chordal_graph_noise_model_ = gtsam::noiseModel::Isotropic::Variance(12, 1);
 
    // Initialize log files
    if (is_simulation_ && robot_id_ ==  0 && !boost::filesystem::exists(error_file_name_)) {
@@ -188,7 +182,8 @@ void CBuzzControllerQuadMapperWithDataset::AddOdometryMeasurement() {
       poses_initial_guess_->insert(current_symbol.key(), new_pose);
 
       // Add transform to local map for pairwise consistency maximization
-      robot_local_map_.addTransform(*new_factor, covariance_matrix_);
+      auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(new_factor->noiseModel())->covariance();
+      robot_local_map_.addTransform(*new_factor, covariance_matrix);
    } else {
       number_of_poses_ --;
       dataset_reading_ended_ = true;
@@ -234,6 +229,7 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurement() {
    gtsam::Pose3 measurement = new_factor->measured();
    number_of_inliers_added_++;
 
+   auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(new_factor->noiseModel())->covariance();
    UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
                                           (int)(gtsam::Symbol(loop_closure_keys.second).chr() - 97),
                                           gtsam::Symbol(loop_closure_keys.first).index(),
@@ -245,7 +241,7 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurement() {
                                           measurement.rotation().quaternion()[2],
                                           measurement.rotation().quaternion()[3],
                                           measurement.rotation().quaternion()[0],
-                                          covariance_matrix_ );
+                                          covariance_matrix );
 
    inliers_keys_.insert(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
 
@@ -254,7 +250,8 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurement() {
    local_pose_graph_no_filtering_->push_back(new_factor);
 
    // Add transform to local map for pairwise consistency maximization
-   robot_local_map_.addTransform(*new_factor, covariance_matrix_);
+   robot_local_map_.addTransform(*new_factor, covariance_matrix);
+   covariance_matrix_for_outlier_ = covariance_matrix;
 
    // Add info for flagged initialization
    IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.first).chr() - 97);
@@ -312,7 +309,7 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurementOutlier() {
 
    // Get an outlier
    gtsam::Pose3 measurement = OutlierMeasurement(gtsam::Rot3(), gtsam::Point3());
-   boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>> new_factor = boost::make_shared<gtsam::BetweenFactor<gtsam::Pose3>>(gtsam::Symbol(loop_closure_keys.first), gtsam::Symbol(loop_closure_keys.second), measurement, noise_model_);
+   boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>> new_factor = boost::make_shared<gtsam::BetweenFactor<gtsam::Pose3>>(gtsam::Symbol(loop_closure_keys.first), gtsam::Symbol(loop_closure_keys.second), measurement, gtsam::noiseModel::Gaussian::Covariance(covariance_matrix_for_outlier_));
 
    UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
                                           (int)(gtsam::Symbol(loop_closure_keys.second).chr() - 97),
@@ -325,7 +322,7 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurementOutlier() {
                                           measurement.rotation().quaternion()[2],
                                           measurement.rotation().quaternion()[3],
                                           measurement.rotation().quaternion()[0],
-                                          covariance_matrix_ );
+                                          covariance_matrix_for_outlier_ );
 
    outliers_keys_.insert(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
 
@@ -334,7 +331,7 @@ int CBuzzControllerQuadMapperWithDataset::AddSeparatorMeasurementOutlier() {
    local_pose_graph_no_filtering_->push_back(new_factor);
 
    // Add transform to local map for pairwise consistency maximization
-   robot_local_map_.addTransform(*new_factor, covariance_matrix_);
+   robot_local_map_.addTransform(*new_factor, covariance_matrix_for_outlier_);
 
    // Add info for flagged initialization
    IncrementNumberOfOutliersWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);

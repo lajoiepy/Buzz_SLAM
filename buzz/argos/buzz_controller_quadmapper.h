@@ -319,12 +319,6 @@ protected:
    // Parameters
    double rotation_noise_std_, translation_noise_std_;
 
-   gtsam::SharedNoiseModel noise_model_;
-
-   gtsam::noiseModel::Isotropic::shared_ptr chordal_graph_noise_model_;
-
-   gtsam::Matrix6 covariance_matrix_;
-
    double rotation_estimate_change_threshold_, pose_estimate_change_threshold_;
 
    bool use_flagged_initialization_;

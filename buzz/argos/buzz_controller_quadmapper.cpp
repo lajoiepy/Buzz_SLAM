@@ -55,13 +55,6 @@ void CBuzzControllerQuadMapper::Init(TConfigurationNode& t_node) {
    anchor_offset_ = gtsam::Point3();
    adjacency_matrix_ = gtsam::zeros(number_of_robots_, number_of_robots_);
 
-   // Isotropic noise models
-   Eigen::VectorXd sigmas(6);
-   sigmas << rotation_noise_std_, rotation_noise_std_, rotation_noise_std_, 
-            translation_noise_std_, translation_noise_std_, translation_noise_std_;
-   noise_model_ = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
-   chordal_graph_noise_model_ = gtsam::noiseModel::Isotropic::Variance(12, 1);
-
    // Delete existent log files
    std::remove("log/datasets/centralized.g2o");
    std::string log_file_name = "log/datasets/" + std::to_string(robot_id_) + ".g2o";
@@ -237,7 +230,8 @@ void CBuzzControllerQuadMapper::AbortOptimization(const bool& log_info) {
 
    for (const auto& transform : robot_local_map_backup_.getTransforms().transforms) {
       if (robot_local_map_.getTransforms().transforms.find(transform.first) == robot_local_map_.getTransforms().transforms.end()) {
-         auto factor = gtsam::BetweenFactor<gtsam::Pose3>(transform.second.i, transform.second.j, transform.second.pose.pose, noise_model_);
+         gtsam::SharedNoiseModel model = gtsam::noiseModel::Gaussian::Covariance(transform.second.pose.covariance_matrix);
+         auto factor = gtsam::BetweenFactor<gtsam::Pose3>(transform.second.i, transform.second.j, transform.second.pose.pose, model);
          robot_local_map_.addTransform(factor, transform.second.pose.covariance_matrix);
          local_pose_graph_->push_back(factor);
       }
@@ -494,7 +488,8 @@ void CBuzzControllerQuadMapper::AddSeparatorToLocalGraph( const int& robot_1_id,
    gtsam::Pose3 transformation(R, t);
 
    // Factor
-   gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_1_symbol, robot_2_symbol, transformation, noise_model_);
+   gtsam::SharedNoiseModel model = gtsam::noiseModel::Gaussian::Covariance(covariance_matrix);
+   gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_1_symbol, robot_2_symbol, transformation, model);
    local_pose_graph_->push_back(new_factor);
    local_pose_graph_no_filtering_->push_back(new_factor);
 
@@ -656,7 +651,7 @@ void CBuzzControllerQuadMapper::UpdateOptimizer() {
    prior_owner_ = best_pair.first;
    if (best_pair.first == robot_id_) {
       gtsam::Key first_key = gtsam::KeyVector(poses_initial_guess_->keys()).at(0);
-      optimizer_->addPrior(first_key, poses_initial_guess_->at<gtsam::Pose3>(first_key), noise_model_);
+      optimizer_->addPrior(first_key, poses_initial_guess_->at<gtsam::Pose3>(first_key), boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3> >(optimizer_->currentGraph().at(0))->noiseModel());
       is_prior_added_ = true;
       if (debug_level_ >= 2) {
          std::cout << "Robot " << robot_id_ << " : Add prior. Key=" << first_key << std::endl;
@@ -690,18 +685,20 @@ void CBuzzControllerQuadMapper::OutliersFiltering() {
       int number_of_measurements_accepted = 0;
       int number_of_measurements_rejected = 0;
       for (const auto& robot : neighbors_within_communication_range_) {
-         auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
+         if (pose_estimates_from_neighbors_.count(robot) > 0) {
+            auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
                                  graph_and_values_, robot_local_map_, pose_estimates_from_neighbors_.at(robot),
                                  confidence_probability_, is_prior_added_);
          
-         number_of_measurements_accepted += max_clique_info.first.first;
-         number_of_measurements_rejected += max_clique_info.first.second;
+            number_of_measurements_accepted += max_clique_info.first.first;
+            number_of_measurements_rejected += max_clique_info.first.second;
 
-         SaveAcceptedAndRejectedKeys(max_clique_info.second.first, max_clique_info.second.second);
+            SaveAcceptedAndRejectedKeys(max_clique_info.second.first, max_clique_info.second.second);
 
-         if (debug_level_ >= 1) {
-            std::cout << "Robot " << robot_id_ << " Outliers filtering, other robot id=" << robot << ", max clique size=" << max_clique_info.first.first 
-                     << ", number of measurements removed=" << max_clique_info.first.second << std::endl;
+            if (debug_level_ >= 1) {
+               std::cout << "Robot " << robot_id_ << " Outliers filtering, other robot id=" << robot << ", max clique size=" << max_clique_info.first.first 
+                        << ", number of measurements removed=" << max_clique_info.first.second << std::endl;
+            }
          }
       }
       if (number_of_measurements_accepted < 4) {

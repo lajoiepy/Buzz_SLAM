@@ -73,6 +73,9 @@ private:
    std::map<int, gtsam::Pose3> ground_truth_poses_;
    boost::shared_ptr<gtsam::Values> ground_truth_data_;
    argos::CCI_PositioningSensor::SReading previous_simulation_gt_pose_;
+   gtsam::SharedNoiseModel noise_model_;
+   gtsam::noiseModel::Isotropic::shared_ptr chordal_graph_noise_model_;
+   gtsam::Matrix6 covariance_matrix_;
 
    // Random numbers generation
    std::random_device rd_{};
