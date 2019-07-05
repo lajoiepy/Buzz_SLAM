@@ -1,6 +1,6 @@
-#include "buzz_controller_quadmapper.h"
+#include "buzz_slam_singleton.h"
 
-namespace buzz_quadmapper {
+namespace buzz_slam {
 
 /****************************************/
 /************ Buzz Closures *************/
@@ -8,26 +8,10 @@ namespace buzz_quadmapper {
 
 static int BuzzInitOptimizer(buzzvm_t vm){
 
-   buzzvm_lload(vm, 1);
-   
-   buzzobj_t buzz_period = buzzvm_stack_at(vm, 1);
-   int period;
-
-   if(buzz_period->o.type == BUZZTYPE_INT) period = buzz_period->i.value;
-   else {
-      buzzvm_seterror(vm,
-                      BUZZVM_ERROR_TYPE,
-                      "srand(x,y): expected %s, got %s in first argument",
-                      buzztype_desc[BUZZTYPE_INT],
-                      buzztype_desc[buzz_period->o.type]
-         );
-      return vm->state;
-   } 
-
    // Initialize optimizer
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->InitOptimizer(period);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->InitOptimizer();
 
    return buzzvm_ret0(vm);
 }
@@ -39,7 +23,7 @@ static int BuzzOptimizerState(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   int state = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->GetOptimizerState();
+   int state = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->GetOptimizerState();
    buzzvm_pushi(vm, state);
 
    return buzzvm_ret1(vm);
@@ -51,7 +35,7 @@ static int BuzzOptimizerState(buzzvm_t vm){
 static int BuzzOptimizerTick(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->OptimizerTick();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->OptimizerTick();
    return buzzvm_ret0(vm);
 }
 
@@ -62,7 +46,7 @@ static int BuzzOptimizerPhase(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   int phase = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->GetOptimizerPhase();
+   int phase = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->GetOptimizerPhase();
    buzzvm_pushi(vm, phase);
 
    return buzzvm_ret1(vm);
@@ -74,7 +58,7 @@ static int BuzzOptimizerPhase(buzzvm_t vm){
 static int BuzzCheckIfAllEstimationDoneAndReset(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->CheckIfAllEstimationDoneAndReset();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->CheckIfAllEstimationDoneAndReset();
    return buzzvm_ret0(vm);
 }
 
@@ -103,7 +87,7 @@ static int BuzzAddNeighborWithinCommunicationRange(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->AddNeighborWithinCommunicationRange(rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->AddNeighborWithinCommunicationRange(rid);
 
    return buzzvm_ret0(vm);
 }
@@ -133,7 +117,7 @@ static int BuzzComputeAndUpdateRotationEstimatesToSend(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->ComputeAndUpdateRotationEstimatesToSend(rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->ComputeAndUpdateRotationEstimatesToSend(rid);
 
    return buzzvm_ret0(vm);
 }
@@ -226,7 +210,7 @@ static int BuzzUpdateNeighborRotationEstimates(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborRotationEstimates(received_rotation_estimates);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateNeighborRotationEstimates(received_rotation_estimates);
 
    return buzzvm_ret0(vm);
 }
@@ -237,7 +221,7 @@ static int BuzzUpdateNeighborRotationEstimates(buzzvm_t vm){
 static int BuzzEstimateRotationAndUpdateRotation(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->EstimateRotationAndUpdateRotation();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->EstimateRotationAndUpdateRotation();
    return buzzvm_ret0(vm);
 }
 
@@ -266,7 +250,7 @@ static int BuzzComputeAndUpdatePoseEstimatesToSend(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->ComputeAndUpdatePoseEstimatesToSend(rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->ComputeAndUpdatePoseEstimatesToSend(rid);
 
    return buzzvm_ret0(vm);
 }
@@ -359,7 +343,7 @@ static int BuzzUpdateNeighborPoseEstimates(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborPoseEstimates(received_pose_estimates);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateNeighborPoseEstimates(received_pose_estimates);
 
    return buzzvm_ret0(vm);
 }
@@ -370,7 +354,7 @@ static int BuzzUpdateNeighborPoseEstimates(buzzvm_t vm){
 static int BuzzEstimatePoseAndUpdatePose(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->EstimatePoseAndUpdatePose();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->EstimatePoseAndUpdatePose();
    return buzzvm_ret0(vm);
 }
 
@@ -395,7 +379,7 @@ static int BuzzUpdateCurrentPoseEstimate(buzzvm_t vm) {buzzvm_lload(vm, 1);
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateCurrentPoseEstimate(pose_id);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateCurrentPoseEstimate(pose_id);
 
    return buzzvm_ret0(vm);
 }
@@ -457,7 +441,7 @@ static int BuzzUpdatePoseEstimateFromNeighbor(buzzvm_t vm){
    int pose_id = b_pose_id->i.value;
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdatePoseEstimateFromNeighbor(rid, pose_id, pose_with_covariance);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdatePoseEstimateFromNeighbor(rid, pose_id, pose_with_covariance);
 
    return buzzvm_ret0(vm);
 }
@@ -527,60 +511,6 @@ static int BuzzRandUniform(buzzvm_t vm){
    buzzvm_pushf(vm, random_value);
 
    return buzzvm_ret1(vm);
-}
-
-/****************************************/
-/****************************************/
-
-static int BuzzGotoAbs(buzzvm_t vm) {
-   /* Push the vector components */
-   buzzvm_lload(vm, 1);
-   buzzvm_lload(vm, 2);
-   buzzvm_lload(vm, 3);
-   /* Create a new vector with that */
-   CVector3 translation;
-   buzzobj_t tX = buzzvm_stack_at(vm, 3);
-   buzzobj_t tY = buzzvm_stack_at(vm, 2);
-   buzzobj_t tZ = buzzvm_stack_at(vm, 1);
-   if(tX->o.type == BUZZTYPE_INT) translation.SetX(tX->i.value);
-   else if(tX->o.type == BUZZTYPE_FLOAT) translation.SetX(tX->f.value);
-   else {
-      buzzvm_seterror(vm,
-                      BUZZVM_ERROR_TYPE,
-                      "goto_abs(x,y): expected %s, got %s in first argument",
-                      buzztype_desc[BUZZTYPE_FLOAT],
-                      buzztype_desc[tX->o.type]
-         );
-      return vm->state;
-   }      
-   if(tY->o.type == BUZZTYPE_INT) translation.SetY(tY->i.value);
-   else if(tY->o.type == BUZZTYPE_FLOAT) translation.SetY(tY->f.value);
-   else {
-      buzzvm_seterror(vm,
-                      BUZZVM_ERROR_TYPE,
-                      "goto_abs(x,y): expected %s, got %s in second argument",
-                      buzztype_desc[BUZZTYPE_FLOAT],
-                      buzztype_desc[tY->o.type]
-         );
-      return vm->state;
-   }
-   if(tZ->o.type == BUZZTYPE_INT) translation.SetZ(tZ->i.value);
-   else if(tZ->o.type == BUZZTYPE_FLOAT) translation.SetZ(tZ->f.value);
-   else {
-      buzzvm_seterror(vm,
-                      BUZZVM_ERROR_TYPE,
-                      "goto_abs(x,y): expected %s, got %s in third argument",
-                      buzztype_desc[BUZZTYPE_FLOAT],
-                      buzztype_desc[tZ->o.type]
-         );
-      return vm->state;
-   }
-   /* Get pointer to the controller */
-   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
-   buzzvm_gload(vm);
-   /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->SetNextPosition(translation);
-   return buzzvm_ret0(vm);
 }
 
 /****************************************/
@@ -674,7 +604,7 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->AddSeparatorToLocalGraph( robot_1_id, robot_2_id,
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->AddSeparatorToLocalGraph( robot_1_id, robot_2_id,
                                                                                                             robot_1_pose_id, robot_2_pose_id,
                                                                                                             x, y, z,
                                                                                                             q_x, q_y, q_z, q_w,
@@ -702,7 +632,9 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 13);
    buzzvm_lload(vm, 14);
    buzzvm_lload(vm, 15);
+   buzzvm_lload(vm, 16);
    /* Retrieve parameters and check their types */
+   buzzobj_t b_optimizer_period = buzzvm_stack_at(vm, 15);
    buzzobj_t b_max_steps_rotation = buzzvm_stack_at(vm, 15);
    buzzobj_t b_max_steps_pose = buzzvm_stack_at(vm, 14);
    buzzobj_t b_number_of_steps_before_failsafe = buzzvm_stack_at(vm, 13);
@@ -727,6 +659,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    bool use_pcm;
    int number_of_steps_before_failsafe;
    int max_steps_rotation, max_steps_pose;
+   int optimizer_period;
 
    if(b_rotation_noise_std->o.type == BUZZTYPE_FLOAT &&
       b_translation_noise_std->o.type == BUZZTYPE_FLOAT &&
@@ -742,7 +675,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_use_pcm->o.type == BUZZTYPE_INT &&
       b_number_of_steps_before_failsafe->o.type == BUZZTYPE_INT &&
       b_max_steps_rotation->o.type == BUZZTYPE_INT &&
-      b_max_steps_pose->o.type) {
+      b_max_steps_pose->o.type == BUZZTYPE_INT &&
+      b_optimizer_period->o.type == BUZZTYPE_INT) {
 
       // Fill in variables
       rotation_noise_std = b_rotation_noise_std->f.value;
@@ -760,6 +694,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       number_of_steps_before_failsafe = b_number_of_steps_before_failsafe->i.value;
       max_steps_rotation = b_max_steps_rotation->i.value;
       max_steps_pose = b_max_steps_pose->i.value;
+      optimizer_period = b_optimizer_period->i.value;
 
    } else {
       buzzvm_seterror(vm,
@@ -772,13 +707,14 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->LoadParameters(number_of_steps_before_failsafe,
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->LoadParameters(optimizer_period, number_of_steps_before_failsafe,
                      use_pcm, confidence_probability, incremental_solving, debug_level,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,
                      number_of_robots, error_file_name,
                      max_steps_rotation, max_steps_pose);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->Init(vm);
    return buzzvm_ret0(vm);
 }
 
@@ -789,7 +725,7 @@ static int BuzzRotationEstimationStoppingConditions(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   bool is_finished = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->RotationEstimationStoppingConditions();
+   bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->RotationEstimationStoppingConditions();
    buzzvm_pushi(vm, is_finished);
 
    return buzzvm_ret1(vm);
@@ -802,7 +738,7 @@ static int BuzzPoseEstimationStoppingConditions(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   bool is_finished = reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->PoseEstimationStoppingConditions();
+   bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->PoseEstimationStoppingConditions();
    buzzvm_pushi(vm, is_finished);
 
    return buzzvm_ret1(vm);
@@ -833,7 +769,7 @@ static int BuzzNeighborRotationEstimationIsFinished(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborRotationEstimationIsFinished(rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->NeighborRotationEstimationIsFinished(rid);
 
    return buzzvm_ret0(vm);
 }
@@ -885,7 +821,7 @@ static int BuzzNeighborPoseEstimationIsFinished(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborPoseEstimationIsFinished(rid, anchor_offset);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->NeighborPoseEstimationIsFinished(rid, anchor_offset);
 
    return buzzvm_ret0(vm);
 }
@@ -927,7 +863,7 @@ static int BuzzNeighborState(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->NeighborState(rid, (buzz_quadmapper::OptimizerState) state, lowest_id);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->NeighborState(rid, (buzz_slam::OptimizerState) state, lowest_id);
 
    return buzzvm_ret0(vm);
 }
@@ -938,7 +874,7 @@ static int BuzzNeighborState(buzzvm_t vm){
 static int BuzzUpdateHasSentStartOptimizationFlag(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateHasSentStartOptimizationFlag(true);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateHasSentStartOptimizationFlag(true);
 }
 
 /****************************************/
@@ -947,7 +883,7 @@ static int BuzzUpdateHasSentStartOptimizationFlag(buzzvm_t vm) {
 static int BuzzUpdateAdjacencyVector(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateAdjacencyVector();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateAdjacencyVector();
 }
 
 /****************************************/
@@ -994,7 +930,7 @@ static int BuzzReceiveAdjacencyVectorFromNeighbor(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->ReceiveAdjacencyVectorFromNeighbor(rid, adjacency_vector);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->ReceiveAdjacencyVectorFromNeighbor(rid, adjacency_vector);
 
    return buzzvm_ret0(vm);
 }
@@ -1025,7 +961,7 @@ static int BuzzUpdateNeighborHasStartedOptimizationFlag(buzzvm_t vm) {
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   reinterpret_cast<CBuzzControllerQuadMapper*>(buzzvm_stack_at(vm, 1)->u.value)->UpdateNeighborHasStartedOptimizationFlag(true, rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateNeighborHasStartedOptimizationFlag(true, rid);
    return buzzvm_ret0(vm);
 }
 
@@ -1033,127 +969,117 @@ static int BuzzUpdateNeighborHasStartedOptimizationFlag(buzzvm_t vm) {
 /************ Registration **************/
 /****************************************/
 
-buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
-   CBuzzControllerSpiri::RegisterFunctions();
-
+buzzvm_state BuzzSLAM::RegisterSLAMFunctions(buzzvm_t buzz_vm) {
    /* Register mapping specific functions */
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "load_parameters", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzLoadParameters));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "load_parameters", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzLoadParameters));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "srand", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzSRand));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "srand", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzSRand));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "rand_uniform", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzRandUniform));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "rand_uniform", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzRandUniform));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "add_separator_to_local_graph", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzAddSeparatorToLocalGraph));
-   buzzvm_gstore(m_tBuzzVM);
-
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "goto_abs", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzGotoAbs));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "add_separator_to_local_graph", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzAddSeparatorToLocalGraph));
+   buzzvm_gstore(buzz_vm);
    
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "init_optimizer", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzInitOptimizer));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "init_optimizer", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzInitOptimizer));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "optimizer_state", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzOptimizerState));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "optimizer_state", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzOptimizerState));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "optimizer_tick", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzOptimizerTick));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "optimizer_tick", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzOptimizerTick));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "add_neighbor_within_communication_range", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzAddNeighborWithinCommunicationRange));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "add_neighbor_within_communication_range", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzAddNeighborWithinCommunicationRange));
+   buzzvm_gstore(buzz_vm);
    
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "compute_and_update_rotation_estimates_to_send", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzComputeAndUpdateRotationEstimatesToSend));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "compute_and_update_rotation_estimates_to_send", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzComputeAndUpdateRotationEstimatesToSend));
+   buzzvm_gstore(buzz_vm);
    
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "compute_and_update_pose_estimates_to_send", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzComputeAndUpdatePoseEstimatesToSend));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "compute_and_update_pose_estimates_to_send", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzComputeAndUpdatePoseEstimatesToSend));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_rotation_estimates", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborRotationEstimates));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "update_neighbor_rotation_estimates", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzUpdateNeighborRotationEstimates));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_pose_estimates", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborPoseEstimates));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "update_neighbor_pose_estimates", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzUpdateNeighborPoseEstimates));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "estimate_rotation_and_update_rotation", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzEstimateRotationAndUpdateRotation));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "estimate_rotation_and_update_rotation", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzEstimateRotationAndUpdateRotation));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "estimate_pose_and_update_pose", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzEstimatePoseAndUpdatePose));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "estimate_pose_and_update_pose", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzEstimatePoseAndUpdatePose));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "rotation_estimation_stopping_conditions", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzRotationEstimationStoppingConditions));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "rotation_estimation_stopping_conditions", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzRotationEstimationStoppingConditions));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "pose_estimation_stopping_conditions", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzPoseEstimationStoppingConditions));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "pose_estimation_stopping_conditions", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzPoseEstimationStoppingConditions));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "neighbor_rotation_estimation_is_finished", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzNeighborRotationEstimationIsFinished));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "neighbor_rotation_estimation_is_finished", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzNeighborRotationEstimationIsFinished));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "neighbor_pose_estimation_is_finished", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzNeighborPoseEstimationIsFinished));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "neighbor_pose_estimation_is_finished", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzNeighborPoseEstimationIsFinished));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "optimizer_phase", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzOptimizerPhase));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "optimizer_phase", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzOptimizerPhase));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "check_if_all_estimation_done_and_reset", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzCheckIfAllEstimationDoneAndReset));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "check_if_all_estimation_done_and_reset", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzCheckIfAllEstimationDoneAndReset));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "neighbor_state", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzNeighborState));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "neighbor_state", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzNeighborState));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_current_pose_estimate", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateCurrentPoseEstimate));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "update_current_pose_estimate", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzUpdateCurrentPoseEstimate));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_pose_estimate_from_neighbor", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdatePoseEstimateFromNeighbor));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "update_pose_estimate_from_neighbor", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzUpdatePoseEstimateFromNeighbor));
+   buzzvm_gstore(buzz_vm);
    
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_has_sent_start_optimization_flag", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateHasSentStartOptimizationFlag));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "update_has_sent_start_optimization_flag", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzUpdateHasSentStartOptimizationFlag));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_adjacency_vector", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateAdjacencyVector));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "update_adjacency_vector", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzUpdateAdjacencyVector));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "receive_adjacency_vector_from_neighbor", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzReceiveAdjacencyVectorFromNeighbor));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "receive_adjacency_vector_from_neighbor", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzReceiveAdjacencyVectorFromNeighbor));
+   buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "update_neighbor_has_started_optimization_flag", 1));
-   buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzUpdateNeighborHasStartedOptimizationFlag));
-   buzzvm_gstore(m_tBuzzVM);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "update_neighbor_has_started_optimization_flag", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzUpdateNeighborHasStartedOptimizationFlag));
+   buzzvm_gstore(buzz_vm);
 
-   return m_tBuzzVM->state;
+   return buzz_vm->state;
 }
 
-/****************************************/
-/****************************************/
-
-REGISTER_CONTROLLER(CBuzzControllerQuadMapper, "buzz_controller_quadmapper");
 }

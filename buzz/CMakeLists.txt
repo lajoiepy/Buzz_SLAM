@@ -4,10 +4,16 @@
 cmake_minimum_required(VERSION 2.8.12)
 
 #
+# Options
+#
+option(ARGOS_SIMULATION "Build for ARGoS Simulation" ON)
+
+#
 # Find pkg-config
 #
 find_package(PkgConfig REQUIRED)
 
+if(ARGOS_SIMULATION)
 #
 # Look for the optional ARGoS package
 #
@@ -22,6 +28,7 @@ if(ARGOS_FOUND)
   include_directories(${LUA_INCLUDE_DIR})
   link_directories(${ARGOS_PREFIX}/lib/argos3/)
 endif(ARGOS_FOUND)
+endif(ARGOS_SIMULATION)
 
 #
 # Find dependancies
@@ -42,12 +49,23 @@ link_libraries(${Boost_LIBRARIES})
 message("Boost Libraries: ${Boost_LIBRARIES}")
 
 #
-# Compile buzz slam library
+# Compile buzz slam library for ARGoS
 #
+if(ARGOS_SIMULATION)
 set(ARGOS_BUZZ_SOURCES
+  slam/utils/buzz_slam_utils.h
+  slam/buzz_slam.h
+  slam/buzz_slam.cpp
+  slam/buzz_slam_singleton.h
+  slam/buzz_slam_closures.cpp
+  slam/specialized/no_sensing/buzz_slam_no_sensing_closures.cpp
+  slam/specialized/no_sensing/buzz_slam_no_sensing.cpp
+  slam/specialized/no_sensing/buzz_slam_no_sensing.h
+  slam/specialized/dataset/buzz_slam_dataset_closures.cpp
+  slam/specialized/dataset/buzz_slam_dataset.cpp
+  slam/specialized/dataset/buzz_slam_dataset.h
   argos/buzz_controller_quadmapper.h      
   argos/buzz_controller_quadmapper.cpp     
-  argos/buzz_closures_quadmapper.cpp     
   argos/simulation_random_walk/buzz_controller_quadmapper_no_sensing.h      
   argos/simulation_random_walk/buzz_controller_quadmapper_no_sensing.cpp
   argos/simulation_random_walk/buzz_closures_quadmapper_no_sensing.cpp     
@@ -78,3 +96,4 @@ set_target_properties(argos3plugin_simulator_buzz_slam PROPERTIES LINKER_LANGUAG
 
 install(TARGETS argos3plugin_simulator_buzz_slam LIBRARY DESTINATION ${ARGOS_PREFIX}/lib/argos3)
 install(DIRECTORY . DESTINATION include/buzz/argos FILES_MATCHING PATTERN "*.h")
+endif(ARGOS_SIMULATION)
