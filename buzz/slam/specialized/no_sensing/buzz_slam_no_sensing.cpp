@@ -190,7 +190,7 @@ gtsam::Pose3 BuzzSLAMNoSensing::OutlierMeasurement(const gtsam::Rot3& R, const g
 /****************************************/
 /****************************************/
 
-int BuzzSLAMNoSensing::ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
+int BuzzSLAMNoSensing::ComputeNoisyFakeSeparatorMeasurement(const gtsam::Point3& t_gt, const gtsam::Rot3& other_robot_R, 
                                                                const int& other_robot_pose_id, const int& other_robot_id, const int& this_robot_pose_id) {
    // Separator symbols
    gtsam::Symbol this_robot_symbol = gtsam::Symbol(robot_id_char_, this_robot_pose_id);
@@ -201,17 +201,12 @@ int BuzzSLAMNoSensing::ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& g
    // Get this robot pose
    gtsam::Pose3 this_robot_pose = ground_truth_poses_.find(this_robot_pose_id)->second;
 
-   // Conversion of the other robot orientation (quaternion to rotation matrix)
-   gtsam::Quaternion other_robot_quat_gtsam(gt_orientation.GetW(), gt_orientation.GetX(), gt_orientation.GetY(), gt_orientation.GetZ());
-   gtsam::Rot3 other_robot_R(other_robot_quat_gtsam);
-
    // Compute transformation between rotations
    gtsam::Rot3 R = this_robot_pose.rotation().inverse() * other_robot_R;
 
    // Convert translation information to gtsam format and perform the appropriate rotation
-   gtsam::Point3 t = { gt_translation.GetX() - this_robot_pose.translation().x(), 
-                       gt_translation.GetY() - this_robot_pose.translation().y(),
-                       gt_translation.GetZ() - this_robot_pose.translation().z() };
+   gtsam::Point3 t = t_gt - this_robot_pose.translation();
+   
    t = this_robot_pose.rotation().inverse() * t;
 
    // Add gaussian noise or make it an outlier

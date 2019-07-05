@@ -67,7 +67,7 @@ static int BuzzLoadDatasetParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<buzz_slam::BuzzSLAMDataset*>(buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot).get())->LoadParameters(dataset_name, sensor_range, outlier_period);
+   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(vm->robot)->LoadParameters(dataset_name, sensor_range, outlier_period);
 
    gtsam::Pose3 pose_gt = reinterpret_cast<CBuzzControllerQuadMapperWithDataset*>(buzzvm_stack_at(vm, 1)->u.value)->GetGroundTruthPose();
    
@@ -80,8 +80,7 @@ static int BuzzLoadDatasetParameters(buzzvm_t vm) {
 
 buzzvm_state CBuzzControllerQuadMapperWithDataset::RegisterFunctions() {
    CBuzzControllerQuadMapper::RegisterFunctions();
-   buzz_slam::BuzzSLAMSingleton::GetInstance().InsertBuzzSLAM<buzz_slam::BuzzSLAMDataset>(m_tBuzzVM->robot);
-   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(m_tBuzzVM->robot)->RegisterSLAMFunctions(this->GetBuzzVM());
+   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(m_tBuzzVM->robot)->RegisterSLAMFunctions(this->GetBuzzVM());
 
    /* Register mapping without sensing specific functions */
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "move", 1));

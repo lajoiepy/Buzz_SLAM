@@ -2,9 +2,6 @@
 #define BUZZ_SLAM_NO_SENSING_H
 
 #include "../../buzz_slam.h"
-#include <buzz/argos/buzz_controller_spiri.h>
-#include <argos3/plugins/robots/generic/control_interface/ci_quadrotor_position_actuator.h>
-#include <argos3/plugins/robots/generic/control_interface/ci_colored_blob_perspective_camera_sensor.h>
 #include <map>
 
 namespace buzz_slam {
@@ -23,7 +20,7 @@ public:
    virtual void Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt);
 
    // Fake measurements generation
-   int ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
+   int ComputeNoisyFakeSeparatorMeasurement(const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt, 
                                           const int& pose_id, const int& robot_id, const int& this_robot_pose_id);
 
    void LoadParameters(const double& sensor_range, const double& outlier_probability);

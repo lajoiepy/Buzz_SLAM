@@ -18,6 +18,7 @@ CBuzzControllerQuadMapper::CBuzzControllerQuadMapper() : CBuzzControllerSpiri() 
 /****************************************/
 
 CBuzzControllerQuadMapper::~CBuzzControllerQuadMapper() {
+   buzz_slam::BuzzSLAMSingleton::GetInstance().Destroy();
 }
 
 /****************************************/

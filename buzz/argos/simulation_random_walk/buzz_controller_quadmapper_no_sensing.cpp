@@ -28,7 +28,7 @@ void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    simulation_step_ = 0;
 
    gtsam::Pose3 pose_gt = GetGroundTruthPose();
-   reinterpret_cast<buzz_slam::BuzzSLAMNoSensing*>(buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(m_tBuzzVM->robot).get())->Init(m_tBuzzVM, pose_gt.translation(), pose_gt.rotation());
+   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMNoSensing>(m_tBuzzVM->robot)->Init(m_tBuzzVM, pose_gt.translation(), pose_gt.rotation());
 }
 
 
@@ -66,13 +66,13 @@ int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& 
       gtsam::Quaternion current_quat_gtsam(current_orientation.GetW(), current_orientation.GetX(), current_orientation.GetY(), current_orientation.GetZ());
       gtsam::Rot3 R_gt(current_quat_gtsam);
    
-      reinterpret_cast<buzz_slam::BuzzSLAMNoSensing*>(buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(m_tBuzzVM->robot).get())->ComputeNoisyFakeOdometryMeasurement(t_gt, R_gt);
+      buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMNoSensing>(m_tBuzzVM->robot)->ComputeNoisyFakeOdometryMeasurement(t_gt, R_gt);
 
       // Log data
       //WriteCurrentDataset();   
    }
 
-   return buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(m_tBuzzVM->robot)->GetNumberOfPoses();
+   return buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMNoSensing>(m_tBuzzVM->robot)->GetNumberOfPoses();
 }
 
 /****************************************/

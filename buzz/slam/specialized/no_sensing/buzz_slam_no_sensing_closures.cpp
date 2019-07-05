@@ -24,8 +24,8 @@ static int BuzzComputeFakeRendezVousSeparator(buzzvm_t vm) {
    buzzobj_t b_gt_yaw = buzzvm_stack_at(vm, 3);
    buzzobj_t b_other_robot_id = buzzvm_stack_at(vm, 2);
    buzzobj_t b_this_robot_pose_id = buzzvm_stack_at(vm, 1);
-   CVector3 estimate_translation, gt_translation;
-   CQuaternion estimate_orientation, gt_orientation;
+   gtsam::Point3 gt_translation;
+   gtsam::Rot3 gt_rotation;
    int other_robot_id, other_robot_pose_id, this_robot_pose_id;
    if(b_this_robot_pose_id->o.type == BUZZTYPE_INT &&
       b_other_robot_id->o.type == BUZZTYPE_INT &&
@@ -36,12 +36,8 @@ static int BuzzComputeFakeRendezVousSeparator(buzzvm_t vm) {
       b_gt_yaw->o.type == BUZZTYPE_FLOAT) {
 
       // Fill in ground truth
-      gt_translation.SetX(b_gt_x->f.value);
-      gt_translation.SetY(b_gt_y->f.value);
-      gt_translation.SetZ(b_gt_z->f.value);
-      CRadians gt_angle(b_gt_yaw->f.value);
-      CVector3 gt_axis(0, 0, 1);
-      gt_orientation = gt_orientation.FromAngleAxis(gt_angle, gt_axis);
+      gt_translation = gtsam::Point3(b_gt_x->f.value, b_gt_y->f.value, b_gt_z->f.value);
+      gt_rotation = gtsam::Rot3::Rz(b_gt_yaw->f.value);
 
       // Get information for symbols
       other_robot_id = b_other_robot_id->i.value;
@@ -59,7 +55,7 @@ static int BuzzComputeFakeRendezVousSeparator(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   int is_outlier = reinterpret_cast<BuzzSLAMNoSensing*>(BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot).get())->ComputeNoisyFakeSeparatorMeasurement(gt_orientation, gt_translation, other_robot_pose_id, other_robot_id, this_robot_pose_id);
+   int is_outlier = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMNoSensing>(vm->robot)->ComputeNoisyFakeSeparatorMeasurement(gt_translation, gt_rotation, other_robot_pose_id, other_robot_id, this_robot_pose_id);
    buzzvm_pushi(vm, is_outlier);
 
    return buzzvm_ret1(vm);

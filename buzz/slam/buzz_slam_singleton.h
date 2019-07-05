@@ -21,12 +21,20 @@ class BuzzSLAMSingleton {
         }
 
         template <class T>
-        void InsertBuzzSLAM(const int& robot_id) {
-            buzz_slam_map_.insert(std::make_pair(robot_id, std::unique_ptr<T>(new T)));
+        T* GetBuzzSLAM(const int& robot_id) {
+            if (buzz_slam_map_.count(robot_id) == 0) {
+                buzz_slam_map_.insert(std::make_pair(robot_id, new T()));
+            }
+            return static_cast<T*>(buzz_slam_map_[robot_id]);
         }
 
-        std::unique_ptr<BuzzSLAM>& GetBuzzSLAM(const int& robot_id) {
-            return buzz_slam_map_[robot_id];
+        void Destroy() {
+            if ( !is_destroyed ) {
+                for (auto buzz_slam : buzz_slam_map_) {
+                    delete buzz_slam.second;
+                }
+                is_destroyed = true;
+            }
         }
 
     private:
@@ -37,7 +45,8 @@ class BuzzSLAMSingleton {
         void operator=(BuzzSLAMSingleton const&) = delete;
 
     private:
-        std::map<int, std::unique_ptr<BuzzSLAM>> buzz_slam_map_;
+        std::map<int, BuzzSLAM*> buzz_slam_map_;
+        bool is_destroyed = false;
 };
 }
 

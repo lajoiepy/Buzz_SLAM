@@ -11,7 +11,7 @@ static int BuzzAddSeparator(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   int is_added = reinterpret_cast<BuzzSLAMDataset*>(BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot).get())->AddSeparatorMeasurement();
+   int is_added = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMDataset>(vm->robot)->AddSeparatorMeasurement();
    buzzvm_pushi(vm, is_added);
 
    return buzzvm_ret1(vm);
@@ -25,7 +25,7 @@ static int BuzzAddSeparatorOutlier(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   int is_added = reinterpret_cast<BuzzSLAMDataset*>(BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot).get())->AddSeparatorMeasurementOutlier();
+   int is_added = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMDataset>(vm->robot)->AddSeparatorMeasurementOutlier();
    buzzvm_pushi(vm, is_added);
 
    return buzzvm_ret1(vm);

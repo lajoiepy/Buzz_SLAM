@@ -11,7 +11,7 @@ static int BuzzInitOptimizer(buzzvm_t vm){
    // Initialize optimizer
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->InitOptimizer();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->InitOptimizer();
 
    return buzzvm_ret0(vm);
 }
@@ -23,7 +23,7 @@ static int BuzzOptimizerState(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   int state = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->GetOptimizerState();
+   int state = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->GetOptimizerState();
    buzzvm_pushi(vm, state);
 
    return buzzvm_ret1(vm);
@@ -35,7 +35,7 @@ static int BuzzOptimizerState(buzzvm_t vm){
 static int BuzzOptimizerTick(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->OptimizerTick();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->OptimizerTick();
    return buzzvm_ret0(vm);
 }
 
@@ -46,7 +46,7 @@ static int BuzzOptimizerPhase(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   int phase = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->GetOptimizerPhase();
+   int phase = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->GetOptimizerPhase();
    buzzvm_pushi(vm, phase);
 
    return buzzvm_ret1(vm);
@@ -58,7 +58,7 @@ static int BuzzOptimizerPhase(buzzvm_t vm){
 static int BuzzCheckIfAllEstimationDoneAndReset(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->CheckIfAllEstimationDoneAndReset();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->CheckIfAllEstimationDoneAndReset();
    return buzzvm_ret0(vm);
 }
 
@@ -87,7 +87,7 @@ static int BuzzAddNeighborWithinCommunicationRange(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->AddNeighborWithinCommunicationRange(rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->AddNeighborWithinCommunicationRange(rid);
 
    return buzzvm_ret0(vm);
 }
@@ -117,7 +117,7 @@ static int BuzzComputeAndUpdateRotationEstimatesToSend(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->ComputeAndUpdateRotationEstimatesToSend(rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->ComputeAndUpdateRotationEstimatesToSend(rid);
 
    return buzzvm_ret0(vm);
 }
@@ -210,7 +210,7 @@ static int BuzzUpdateNeighborRotationEstimates(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateNeighborRotationEstimates(received_rotation_estimates);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->UpdateNeighborRotationEstimates(received_rotation_estimates);
 
    return buzzvm_ret0(vm);
 }
@@ -221,7 +221,7 @@ static int BuzzUpdateNeighborRotationEstimates(buzzvm_t vm){
 static int BuzzEstimateRotationAndUpdateRotation(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->EstimateRotationAndUpdateRotation();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->EstimateRotationAndUpdateRotation();
    return buzzvm_ret0(vm);
 }
 
@@ -250,7 +250,7 @@ static int BuzzComputeAndUpdatePoseEstimatesToSend(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->ComputeAndUpdatePoseEstimatesToSend(rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->ComputeAndUpdatePoseEstimatesToSend(rid);
 
    return buzzvm_ret0(vm);
 }
@@ -343,7 +343,7 @@ static int BuzzUpdateNeighborPoseEstimates(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateNeighborPoseEstimates(received_pose_estimates);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->UpdateNeighborPoseEstimates(received_pose_estimates);
 
    return buzzvm_ret0(vm);
 }
@@ -354,7 +354,7 @@ static int BuzzUpdateNeighborPoseEstimates(buzzvm_t vm){
 static int BuzzEstimatePoseAndUpdatePose(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->EstimatePoseAndUpdatePose();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->EstimatePoseAndUpdatePose();
    return buzzvm_ret0(vm);
 }
 
@@ -379,7 +379,7 @@ static int BuzzUpdateCurrentPoseEstimate(buzzvm_t vm) {buzzvm_lload(vm, 1);
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateCurrentPoseEstimate(pose_id);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->UpdateCurrentPoseEstimate(pose_id);
 
    return buzzvm_ret0(vm);
 }
@@ -441,7 +441,7 @@ static int BuzzUpdatePoseEstimateFromNeighbor(buzzvm_t vm){
    int pose_id = b_pose_id->i.value;
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdatePoseEstimateFromNeighbor(rid, pose_id, pose_with_covariance);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->UpdatePoseEstimateFromNeighbor(rid, pose_id, pose_with_covariance);
 
    return buzzvm_ret0(vm);
 }
@@ -604,7 +604,7 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->AddSeparatorToLocalGraph( robot_1_id, robot_2_id,
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->AddSeparatorToLocalGraph( robot_1_id, robot_2_id,
                                                                                                             robot_1_pose_id, robot_2_pose_id,
                                                                                                             x, y, z,
                                                                                                             q_x, q_y, q_z, q_w,
@@ -707,7 +707,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->LoadParameters(optimizer_period, number_of_steps_before_failsafe,
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->LoadParameters(optimizer_period, number_of_steps_before_failsafe,
                      use_pcm, confidence_probability, incremental_solving, debug_level,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
@@ -724,7 +724,7 @@ static int BuzzRotationEstimationStoppingConditions(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->RotationEstimationStoppingConditions();
+   bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->RotationEstimationStoppingConditions();
    buzzvm_pushi(vm, is_finished);
 
    return buzzvm_ret1(vm);
@@ -737,7 +737,7 @@ static int BuzzPoseEstimationStoppingConditions(buzzvm_t vm){
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->PoseEstimationStoppingConditions();
+   bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->PoseEstimationStoppingConditions();
    buzzvm_pushi(vm, is_finished);
 
    return buzzvm_ret1(vm);
@@ -768,7 +768,7 @@ static int BuzzNeighborRotationEstimationIsFinished(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->NeighborRotationEstimationIsFinished(rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->NeighborRotationEstimationIsFinished(rid);
 
    return buzzvm_ret0(vm);
 }
@@ -820,7 +820,7 @@ static int BuzzNeighborPoseEstimationIsFinished(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->NeighborPoseEstimationIsFinished(rid, anchor_offset);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->NeighborPoseEstimationIsFinished(rid, anchor_offset);
 
    return buzzvm_ret0(vm);
 }
@@ -862,7 +862,7 @@ static int BuzzNeighborState(buzzvm_t vm){
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->NeighborState(rid, (buzz_slam::OptimizerState) state, lowest_id);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->NeighborState(rid, (buzz_slam::OptimizerState) state, lowest_id);
 
    return buzzvm_ret0(vm);
 }
@@ -873,7 +873,7 @@ static int BuzzNeighborState(buzzvm_t vm){
 static int BuzzUpdateHasSentStartOptimizationFlag(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateHasSentStartOptimizationFlag(true);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->UpdateHasSentStartOptimizationFlag(true);
 }
 
 /****************************************/
@@ -882,7 +882,7 @@ static int BuzzUpdateHasSentStartOptimizationFlag(buzzvm_t vm) {
 static int BuzzUpdateAdjacencyVector(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateAdjacencyVector();
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->UpdateAdjacencyVector();
 }
 
 /****************************************/
@@ -929,7 +929,7 @@ static int BuzzReceiveAdjacencyVectorFromNeighbor(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->ReceiveAdjacencyVectorFromNeighbor(rid, adjacency_vector);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->ReceiveAdjacencyVectorFromNeighbor(rid, adjacency_vector);
 
    return buzzvm_ret0(vm);
 }
@@ -960,7 +960,7 @@ static int BuzzUpdateNeighborHasStartedOptimizationFlag(buzzvm_t vm) {
 
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->UpdateNeighborHasStartedOptimizationFlag(true, rid);
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->UpdateNeighborHasStartedOptimizationFlag(true, rid);
    return buzzvm_ret0(vm);
 }
 

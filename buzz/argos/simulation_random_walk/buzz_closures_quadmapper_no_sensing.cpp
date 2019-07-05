@@ -86,7 +86,7 @@ static int BuzzLoadNoSensingParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   reinterpret_cast<buzz_slam::BuzzSLAMNoSensing*>(buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot).get())->LoadParameters(sensor_range, outlier_probability);
+   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMNoSensing>(vm->robot)->LoadParameters(sensor_range, outlier_probability);
    
    return buzzvm_ret0(vm);
 }
@@ -97,8 +97,7 @@ static int BuzzLoadNoSensingParameters(buzzvm_t vm) {
 
 buzzvm_state CBuzzControllerQuadMapperNoSensing::RegisterFunctions() {
    CBuzzControllerQuadMapper::RegisterFunctions();
-   buzz_slam::BuzzSLAMSingleton::GetInstance().InsertBuzzSLAM<buzz_slam::BuzzSLAMNoSensing>(m_tBuzzVM->robot);
-   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(m_tBuzzVM->robot)->RegisterSLAMFunctions(this->GetBuzzVM());
+   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMNoSensing>(m_tBuzzVM->robot)->RegisterSLAMFunctions(this->GetBuzzVM());
 
    /* Register mapping without sensing specific functions */
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "move_forward_fake_odometry", 1));
