@@ -17,7 +17,7 @@ public:
    
    virtual ~BuzzSLAMDataset();
 
-   virtual void Init();
+   virtual void Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt);
 
    // Fake measurements generation
    int AddSeparatorMeasurement();

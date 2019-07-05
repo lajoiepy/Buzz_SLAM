@@ -10,8 +10,9 @@ namespace buzz_slam {
 /****************************************/
 /****************************************/
 
-void BuzzSLAMNoSensing::Init(){
-
+void BuzzSLAMNoSensing::Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt){
+   BuzzSLAM::Init(buzz_vm);
+   
    // Initialize for tracing variables
    number_of_outliers_added_ = 0;
    number_of_inliers_added_ = 0;
@@ -26,12 +27,12 @@ void BuzzSLAMNoSensing::Init(){
    uniform_distribution_outliers_translation_ = std::uniform_real_distribution<>{0, sensor_range_};
    uniform_distribution_outliers_rotation_ = std::uniform_real_distribution<>{-M_PI, M_PI};
    uniform_distribution_draw_outlier_ = std::uniform_real_distribution<>{0, 1};
-   previous_simulation_gt_pose_ = m_pcPos->GetReading();
+   previous_simulation_gt_pose_ = gtsam::Pose3(R_gt, t_gt);
 
    // Save ground truth for fake separator creation
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
    ground_truth_data_ = boost::make_shared< gtsam::Values >();
-   SavePoseGroundTruth();
+   SavePoseGroundTruth(t_gt, R_gt);
 
    // Initialize covariance matrix
    covariance_matrix_ = gtsam::Matrix6::Zero();
@@ -76,7 +77,7 @@ void BuzzSLAMNoSensing::InitializePoseGraphOptimization() {
    
    RemoveDisconnectedNeighbors();
 
-   CBuzzControllerQuadMapper::InitializePoseGraphOptimization();
+   BuzzSLAM::InitializePoseGraphOptimization();
 
 }
 
@@ -91,13 +92,13 @@ void BuzzSLAMNoSensing::LoadParameters(const double& sensor_range, const double&
 /****************************************/
 /****************************************/
 
-void BuzzSLAMNoSensing::ComputeNoisyFakeOdometryMeasurement() {
+void BuzzSLAMNoSensing::ComputeNoisyFakeOdometryMeasurement(const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt) {
    
    // Extract info
-   CQuaternion previous_orientation = previous_simulation_gt_pose_.Orientation;
-   CQuaternion current_orientation = m_pcPos->GetReading().Orientation;
-   CVector3 previous_position = previous_simulation_gt_pose_.Position;
-   CVector3 current_position = m_pcPos->GetReading().Position;
+   gtsam::Rot3 previous_R = previous_simulation_gt_pose_.rotation();
+   gtsam::Rot3 current_R = R_gt;
+   gtsam::Point3 previous_position = previous_simulation_gt_pose_.translation();
+   gtsam::Point3 current_position = t_gt;
 
    // Increase the number of poses
    IncrementNumberOfPoses();
@@ -105,21 +106,11 @@ void BuzzSLAMNoSensing::ComputeNoisyFakeOdometryMeasurement() {
    // Next symbol
    gtsam::Symbol current_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
 
-   // Conversion of the previous orientation (quaternion to rotation matrix)
-   gtsam::Quaternion previous_quat_gtsam(previous_orientation.GetW(), previous_orientation.GetX(), previous_orientation.GetY(), previous_orientation.GetZ());
-   gtsam::Rot3 previous_R(previous_quat_gtsam);
-   
-   // Conversion of the current orientation (quaternion to rotation matrix)
-   gtsam::Quaternion current_quat_gtsam(current_orientation.GetW(), current_orientation.GetX(), current_orientation.GetY(), current_orientation.GetZ());
-   gtsam::Rot3 current_R(current_quat_gtsam);
-
    // Compute transformation between rotations
    gtsam::Rot3 R = previous_R.inverse() * current_R;
 
    // Convert translation information to gtsam format and perform the appropriate rotation
-   gtsam::Point3 t = {  current_position.GetX() - previous_position.GetX(), 
-                        current_position.GetY() - previous_position.GetY(),
-                        current_position.GetZ() - previous_position.GetZ()};
+   gtsam::Point3 t = current_position - previous_position;
    t = previous_R.inverse() * t;
 
    // Add gaussian noise
@@ -129,7 +120,7 @@ void BuzzSLAMNoSensing::ComputeNoisyFakeOdometryMeasurement() {
    gtsam::BetweenFactor<gtsam::Pose3> new_factor(previous_symbol_, current_symbol_, measurement, noise_model_);
 
    // Update attributes value
-   previous_simulation_gt_pose_ = m_pcPos->GetReading();
+   previous_simulation_gt_pose_ = gtsam::Pose3(R_gt, t_gt);
    auto new_pose = poses_initial_guess_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
 
    // Save initial guess without update (to compute errors)
@@ -152,7 +143,7 @@ void BuzzSLAMNoSensing::ComputeNoisyFakeOdometryMeasurement() {
    robot_local_map_.addTransform(new_factor, covariance_matrix_);
 
    // Save ground truth for fake separator creation
-   SavePoseGroundTruth();
+   SavePoseGroundTruth(t_gt, R_gt);
 }
 
 /****************************************/
@@ -240,7 +231,7 @@ int BuzzSLAMNoSensing::ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& g
    if (other_robot_symbol.chr() > this_robot_symbol.chr()) {
       new_factor = gtsam::BetweenFactor<gtsam::Pose3>(this_robot_symbol, other_robot_symbol, measurement, noise_model_);
 
-      UpdateCurrentSeparatorBuzzStructure( this->GetBuzzVM()->robot,
+      UpdateCurrentSeparatorBuzzStructure(   robot_id_,
                                              other_robot_id,
                                              this_robot_pose_id,
                                              other_robot_pose_id,
@@ -263,7 +254,7 @@ int BuzzSLAMNoSensing::ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& g
       new_factor = gtsam::BetweenFactor<gtsam::Pose3>(other_robot_symbol, this_robot_symbol, measurement, noise_model_);
 
       UpdateCurrentSeparatorBuzzStructure( other_robot_id,
-                                             this->GetBuzzVM()->robot,
+                                             robot_id_,
                                              other_robot_pose_id,
                                              this_robot_pose_id,
                                              -measurement.x(),
@@ -298,14 +289,7 @@ int BuzzSLAMNoSensing::ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& g
 /****************************************/
 /****************************************/
 
-void BuzzSLAMNoSensing::SavePoseGroundTruth(){
-   gtsam::Point3 t_gt = {  m_pcPos->GetReading().Position.GetX(), 
-                           m_pcPos->GetReading().Position.GetY(),
-                           m_pcPos->GetReading().Position.GetZ() };
-   
-   CQuaternion current_orientation = m_pcPos->GetReading().Orientation;
-   gtsam::Quaternion current_quat_gtsam(current_orientation.GetW(), current_orientation.GetX(), current_orientation.GetY(), current_orientation.GetZ());
-   gtsam::Rot3 R_gt(current_quat_gtsam);
+void BuzzSLAMNoSensing::SavePoseGroundTruth(const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt){
 
    gtsam::Pose3 pose_gt(R_gt, t_gt);
    ground_truth_poses_.insert(std::make_pair(number_of_poses_, pose_gt));   
@@ -318,7 +302,7 @@ void BuzzSLAMNoSensing::SavePoseGroundTruth(){
 /****************************************/
 
 void BuzzSLAMNoSensing::WriteInitialDataset() {
-   CBuzzControllerQuadMapper::WriteInitialDataset();
+   BuzzSLAM::WriteInitialDataset();
    // Write ground truth
    std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_gt.g2o";
    gtsam::writeG2o(gtsam::NonlinearFactorGraph(), *ground_truth_data_, dataset_file_name);
@@ -328,7 +312,7 @@ void BuzzSLAMNoSensing::WriteInitialDataset() {
 /****************************************/
 
 void BuzzSLAMNoSensing::WriteOptimizedDataset() {
-   CBuzzControllerQuadMapper::WriteOptimizedDataset();
+   BuzzSLAM::WriteOptimizedDataset();
 
    std::string inliers_added_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_inliers_added.g2o";
    std::ofstream inliers_added_file;
@@ -734,7 +718,7 @@ void BuzzSLAMNoSensing::ComputeCentralizedEstimateIncremental(std::set<int> robo
 /****************************************/
 
 void BuzzSLAMNoSensing::AbortOptimization(const bool& log_info){
-   CBuzzControllerQuadMapper::AbortOptimization(log_info);
+   BuzzSLAM::AbortOptimization(log_info);
    if (log_info) {
       // Initialize the set of robots on which to evaluate
       std::set<int> robots = neighbors_within_communication_range_;

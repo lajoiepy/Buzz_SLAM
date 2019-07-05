@@ -26,6 +26,9 @@ CBuzzControllerQuadMapperNoSensing::~CBuzzControllerQuadMapperNoSensing() {
 void CBuzzControllerQuadMapperNoSensing::Init(TConfigurationNode& t_node){
    CBuzzControllerQuadMapper::Init(t_node);
    simulation_step_ = 0;
+
+   gtsam::Pose3 pose_gt = GetGroundTruthPose();
+   reinterpret_cast<buzz_slam::BuzzSLAMNoSensing*>(buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(m_tBuzzVM->robot).get())->Init(m_tBuzzVM, pose_gt.translation(), pose_gt.rotation());
 }
 
 
@@ -55,13 +58,36 @@ int CBuzzControllerQuadMapperNoSensing::MoveForwardFakeOdometry(const CVector3& 
    
    if (simulation_step_ % simulation_time_divider == 0) {
       // Add noisy measurement
-      reinterpret_cast<buzz_slam::BuzzSLAMNoSensing*>(buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(m_tBuzzVM->robot))->ComputeNoisyFakeOdometryMeasurement();
+      gtsam::Point3 t_gt = {  m_pcPos->GetReading().Position.GetX(), 
+                              m_pcPos->GetReading().Position.GetY(),
+                              m_pcPos->GetReading().Position.GetZ() };
+      
+      CQuaternion current_orientation = m_pcPos->GetReading().Orientation;
+      gtsam::Quaternion current_quat_gtsam(current_orientation.GetW(), current_orientation.GetX(), current_orientation.GetY(), current_orientation.GetZ());
+      gtsam::Rot3 R_gt(current_quat_gtsam);
+   
+      reinterpret_cast<buzz_slam::BuzzSLAMNoSensing*>(buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(m_tBuzzVM->robot).get())->ComputeNoisyFakeOdometryMeasurement(t_gt, R_gt);
 
       // Log data
       //WriteCurrentDataset();   
    }
 
    return buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(m_tBuzzVM->robot)->GetNumberOfPoses();
+}
+
+/****************************************/
+/****************************************/
+
+gtsam::Pose3 CBuzzControllerQuadMapperNoSensing::GetGroundTruthPose() {
+   gtsam::Point3 t_gt = {  m_pcPos->GetReading().Position.GetX(), 
+                           m_pcPos->GetReading().Position.GetY(),
+                           m_pcPos->GetReading().Position.GetZ() };
+   
+   CQuaternion current_orientation = m_pcPos->GetReading().Orientation;
+   gtsam::Quaternion current_quat_gtsam(current_orientation.GetW(), current_orientation.GetX(), current_orientation.GetY(), current_orientation.GetZ());
+   gtsam::Rot3 R_gt(current_quat_gtsam);
+
+   return gtsam::Pose3(R_gt, t_gt);
 }
 
 }

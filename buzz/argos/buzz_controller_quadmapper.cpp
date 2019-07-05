@@ -99,7 +99,6 @@ static int BuzzGotoAbs(buzzvm_t vm) {
 
 buzzvm_state CBuzzControllerQuadMapper::RegisterFunctions() {
    CBuzzControllerSpiri::RegisterFunctions();
-   fprintf(stdout, "ROBOT %d , Register functions \n", m_tBuzzVM->robot);
 
    buzzvm_pushs(m_tBuzzVM, buzzvm_string_register(m_tBuzzVM, "goto_abs", 1));
    buzzvm_pushcc(m_tBuzzVM, buzzvm_function_register(m_tBuzzVM, BuzzGotoAbs));

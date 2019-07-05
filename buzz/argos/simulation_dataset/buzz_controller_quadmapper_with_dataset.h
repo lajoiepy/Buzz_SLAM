@@ -26,6 +26,8 @@ public:
    int Move();
 
    buzzvm_state RegisterFunctions();
+
+   gtsam::Pose3 GetGroundTruthPose();
 };
 }
 #endif

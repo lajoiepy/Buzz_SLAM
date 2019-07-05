@@ -21,7 +21,8 @@ BuzzSLAMDataset::~BuzzSLAMDataset() {
 /****************************************/
 /****************************************/
 
-void BuzzSLAMDataset::Init(){
+void BuzzSLAMDataset::Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt){
+   BuzzSLAM::Init(buzz_vm);
 
    // Initialize for tracing variables
    number_of_outliers_added_ = 0;
@@ -62,14 +63,12 @@ void BuzzSLAMDataset::Init(){
    std::remove(log_file_name.c_str());
 
    // Read .g2o dataset file
-   std::string dataset_file_name = "datasets/" + dataset_name_ + "/" + std::to_string(robot_id_) + ".g2o";
+   std::string dataset_file_name = dataset_name_ + "/" + std::to_string(robot_id_) + ".g2o";
    auto dataset_graph_and_values = gtsam::readG2o(dataset_file_name, true);
 
    // Fill values with odometry starting from ground truth position
-   CQuaternion initial_orientation_reading = m_pcPos->GetReading().Orientation;
-   auto initial_orientation = gtsam::Rot3(initial_orientation_reading.GetW(),initial_orientation_reading.GetX(),initial_orientation_reading.GetY(),initial_orientation_reading.GetZ());
-   CVector3 initial_translation_reading = m_pcPos->GetReading().Position;
-   auto initial_translation = gtsam::Point3(initial_translation_reading.GetX(), initial_translation_reading.GetY(), initial_translation_reading.GetZ());
+   auto initial_orientation = R_gt;
+   auto initial_translation = t_gt;
    auto current_pose = gtsam::Pose3(initial_orientation, initial_translation);
    auto current_key = gtsam::Symbol(robot_id_char_, 0).key();
    dataset_graph_and_values.second->insert(current_key, current_pose);
@@ -337,7 +336,7 @@ int BuzzSLAMDataset::AddSeparatorMeasurementOutlier() {
 /****************************************/
 
 void BuzzSLAMDataset::WriteOptimizedDataset() {
-   CBuzzControllerQuadMapper::WriteOptimizedDataset();
+   BuzzSLAM::WriteOptimizedDataset();
 
    std::string inliers_added_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_inliers_added.g2o";
    std::ofstream inliers_added_file;
@@ -739,7 +738,7 @@ void BuzzSLAMDataset::ComputeCentralizedEstimateIncremental(std::set<int> robots
 /****************************************/
 
 void BuzzSLAMDataset::AbortOptimization(const bool& log_info){
-   CBuzzControllerQuadMapper::AbortOptimization(log_info);
+   BuzzSLAM::AbortOptimization(log_info);
    if (log_info) {
       // Initialize the set of robots on which to evaluate
       std::set<int> robots = neighbors_within_communication_range_;

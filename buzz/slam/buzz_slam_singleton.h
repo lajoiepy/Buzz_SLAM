@@ -20,11 +20,12 @@ class BuzzSLAMSingleton {
             return instance;
         }
 
-        void InsertBuzzSLAM(const int& robot_id, BuzzSLAM* buzz_slam) {
-            buzz_slam_map_.insert(std::make_pair(robot_id, buzz_slam));
+        template <class T>
+        void InsertBuzzSLAM(const int& robot_id) {
+            buzz_slam_map_.insert(std::make_pair(robot_id, std::unique_ptr<T>(new T)));
         }
 
-        BuzzSLAM* GetBuzzSLAM(const int& robot_id) {
+        std::unique_ptr<BuzzSLAM>& GetBuzzSLAM(const int& robot_id) {
             return buzz_slam_map_[robot_id];
         }
 
@@ -36,7 +37,7 @@ class BuzzSLAMSingleton {
         void operator=(BuzzSLAMSingleton const&) = delete;
 
     private:
-        std::map<int, BuzzSLAM*> buzz_slam_map_;
+        std::map<int, std::unique_ptr<BuzzSLAM>> buzz_slam_map_;
 };
 }
 

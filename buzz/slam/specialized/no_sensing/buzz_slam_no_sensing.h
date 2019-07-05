@@ -20,7 +20,7 @@ public:
    
    virtual ~BuzzSLAMNoSensing() {};
 
-   virtual void Init();
+   virtual void Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt);
 
    // Fake measurements generation
    int ComputeNoisyFakeSeparatorMeasurement(const CQuaternion& gt_orientation, const CVector3& gt_translation, 
@@ -33,13 +33,13 @@ public:
 public:
 
    // Fake measurements generation
-   void ComputeNoisyFakeOdometryMeasurement();
+   void ComputeNoisyFakeOdometryMeasurement(const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt);
 
    gtsam::Pose3 AddGaussianNoiseToMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t);
 
    gtsam::Pose3 OutlierMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t);
 
-   void SavePoseGroundTruth();
+   void SavePoseGroundTruth(const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt);
 
 protected:
 
@@ -68,7 +68,7 @@ private:
    // Ground truth information to compute fake measurements
    std::map<int, gtsam::Pose3> ground_truth_poses_;
    boost::shared_ptr<gtsam::Values> ground_truth_data_;
-   argos::CCI_PositioningSensor::SReading previous_simulation_gt_pose_;
+   gtsam::Pose3 previous_simulation_gt_pose_;
    gtsam::SharedNoiseModel noise_model_;
    gtsam::noiseModel::Isotropic::shared_ptr chordal_graph_noise_model_;
    gtsam::Matrix6 covariance_matrix_;

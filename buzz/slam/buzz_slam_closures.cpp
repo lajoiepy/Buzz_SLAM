@@ -714,7 +714,6 @@ static int BuzzLoadParameters(buzzvm_t vm) {
                      use_flagged_initialization, is_simulation,
                      number_of_robots, error_file_name,
                      max_steps_rotation, max_steps_pose);
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM(vm->robot)->Init(vm);
    return buzzvm_ret0(vm);
 }
 

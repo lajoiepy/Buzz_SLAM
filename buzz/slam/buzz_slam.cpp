@@ -6,16 +6,7 @@ namespace buzz_slam {
 
 /****************************************/
 /****************************************/
-
-BuzzSLAM::BuzzSLAM(): local_pose_graph_(new gtsam::NonlinearFactorGraph), 
-                    local_pose_graph_no_filtering_(new gtsam::NonlinearFactorGraph),
-                    local_pose_graph_for_centralized_evaluation_(new gtsam::NonlinearFactorGraph),
-                    poses_initial_guess_(new gtsam::Values),
-                    poses_initial_guess_no_updates_(new gtsam::Values),
-                    poses_initial_guess_centralized_incremental_updates_(new gtsam::Values),
-                    graph_and_values_(local_pose_graph_, poses_initial_guess_)
-                    {
-   fprintf(stdout, "BuzzSLAM constructor \n");
+BuzzSLAM::BuzzSLAM() {
 }
 
 /****************************************/
@@ -34,14 +25,14 @@ void BuzzSLAM::Init(buzzvm_t buzz_vm) {
    robot_id_ = buzz_vm_->robot;
    robot_id_char_ = (unsigned char)(97 + robot_id_);
    previous_symbol_ = gtsam::Symbol(robot_id_char_, number_of_poses_);
-   //local_pose_graph_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
-   //local_pose_graph_no_filtering_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
-   //local_pose_graph_for_centralized_evaluation_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
-   //poses_initial_guess_ = boost::make_shared< gtsam::Values >();
+   local_pose_graph_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
+   local_pose_graph_no_filtering_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
+   local_pose_graph_for_centralized_evaluation_ = boost::make_shared< gtsam::NonlinearFactorGraph >();
+   poses_initial_guess_ = boost::make_shared< gtsam::Values >();
    poses_initial_guess_->insert(previous_symbol_.key(), gtsam::Pose3());
-   //poses_initial_guess_no_updates_ = boost::make_shared< gtsam::Values >();
+   poses_initial_guess_no_updates_ = boost::make_shared< gtsam::Values >();
    poses_initial_guess_no_updates_->insert(previous_symbol_.key(), gtsam::Pose3());
-   //poses_initial_guess_centralized_incremental_updates_ = boost::make_shared< gtsam::Values >();
+   poses_initial_guess_centralized_incremental_updates_ = boost::make_shared< gtsam::Values >();
    poses_initial_guess_centralized_incremental_updates_->insert(previous_symbol_.key(), gtsam::Pose3());
    current_rotation_iteration_ = 0;
    current_pose_iteration_ = 0;
@@ -77,9 +68,7 @@ void BuzzSLAM::Init(buzzvm_t buzz_vm) {
    log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
    std::remove(log_file_name.c_str());
 
-   fprintf(stdout, "ROBOT %d , INITIALIZATION!!!! size = %d \n", robot_id_, local_pose_graph_->size());
    InitOptimizer();
-   fprintf(stdout, "ROBOT %d , END!!!! size = %d \n", robot_id_, optimizer_state_);
 
    for (int robot = 0; robot < number_of_robots_; robot++) {
     neighbors_state_.insert(std::make_pair(robot, OptimizerState::Idle));
@@ -567,7 +556,7 @@ void BuzzSLAM::InitOptimizer() {
 
    optimizer_ = boost::shared_ptr<distributed_mapper::DistributedMapper>(new distributed_mapper::DistributedMapper(robot_id_char_));
 
-   //graph_and_values_ = std::make_pair(local_pose_graph_, poses_initial_guess_);
+   graph_and_values_ = std::make_pair(local_pose_graph_, poses_initial_guess_);
 
    // Use between noise or not in optimizePoses
    optimizer_->setUseBetweenNoiseFlag(false);
