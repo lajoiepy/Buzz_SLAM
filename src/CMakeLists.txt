@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 2.8.12)
 # Options
 #
 option(ARGOS_SIMULATION "Build for ARGoS Simulation" ON)
+option(IRL_ROBOT "Build for IRL robot" ON)
 
 #
 # Find pkg-config
@@ -97,3 +98,37 @@ set_target_properties(argos3plugin_simulator_buzz_slam PROPERTIES LINKER_LANGUAG
 install(TARGETS argos3plugin_simulator_buzz_slam LIBRARY DESTINATION ${ARGOS_PREFIX}/lib/argos3)
 install(DIRECTORY . DESTINATION include/buzz/argos FILES_MATCHING PATTERN "*.h")
 endif(ARGOS_SIMULATION)
+
+if(IRL_ROBOT)
+find_package(Buzz REQUIRED)
+include_directories(${CMAKE_SOURCE_DIR}/src ${BUZZ_C_INCLUDE_DIR})
+add_executable(generic_robot_buzz_slam
+  slam/utils/buzz_slam_utils.h
+  slam/buzz_slam.h
+  slam/buzz_slam.cpp
+  slam/buzz_slam_singleton.h
+  slam/buzz_slam_closures.cpp
+  slam/specialized/no_sensing/buzz_slam_no_sensing_closures.cpp
+  slam/specialized/no_sensing/buzz_slam_no_sensing.cpp
+  slam/specialized/no_sensing/buzz_slam_no_sensing.h
+  slam/specialized/dataset/buzz_slam_dataset_closures.cpp
+  slam/specialized/dataset/buzz_slam_dataset.cpp
+  slam/specialized/dataset/buzz_slam_dataset.h
+  generic_robot/utils/buzz_utils.cpp 
+  generic_robot/utils/buzz_utils.h
+  generic_robot/buzz_generic_robot_slam_datasets.cpp)
+target_link_libraries(generic_robot_buzz_slam 
+  buzz
+  buzzdbg
+  gtsam
+  distributed_mapper
+  distributed_pcm
+  global_map_solver
+  fast_max-clique_finder
+  pairwise_consistency
+  robot_measurements
+  graph_utils
+  -lpthread
+  )
+install(TARGETS generic_robot_buzz_slam RUNTIME DESTINATION bin)
+endif(IRL_ROBOT)

@@ -83,7 +83,15 @@ static int BuzzLoadDatasetParameters(buzzvm_t vm) {
    buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(vm->robot)->LoadParameters(dataset_name, sensor_range, outlier_period);
    
    return buzzvm_ret0(vm);
-}
+} 
+
+/****************************************/
+/****************************************/
+
+static int BuzzReadNextEntry(buzzvm_t vm) {
+   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(vm->robot)->AddOdometryMeasurement();
+   return buzzvm_ret0(vm);
+} 
 
 /****************************************/
 /************ Registration **************/
@@ -101,6 +109,9 @@ buzzvm_state BuzzSLAMDataset::RegisterSLAMFunctions(buzzvm_t buzz_vm) {
    buzzvm_gstore(buzz_vm);
    buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "load_dataset_parameters", 1));
    buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzLoadDatasetParameters));
+   buzzvm_gstore(buzz_vm);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "read_next_entry", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzReadNextEntry));
    buzzvm_gstore(buzz_vm);
 
    return buzz_vm->state;
