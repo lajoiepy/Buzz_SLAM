@@ -62,6 +62,47 @@ static int BuzzComputeFakeRendezVousSeparator(buzzvm_t vm) {
 }
 
 /****************************************/
+/****************************************/
+
+static int BuzzLoadNoSensingParameters(buzzvm_t vm) {
+   /* Push the vector components */
+   buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
+   /* Create a new vector with that */
+   float sensor_range;
+   float outlier_probability;
+   buzzobj_t b_sensor_range = buzzvm_stack_at(vm, 2);
+   buzzobj_t b_outlier_probability = buzzvm_stack_at(vm, 1);
+   if(b_sensor_range->o.type == BUZZTYPE_FLOAT) sensor_range = b_sensor_range->f.value;
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "load_no_sensing_parameters: expected %s, got %s in first argument",
+                      buzztype_desc[BUZZTYPE_FLOAT],
+                      buzztype_desc[b_sensor_range->o.type]
+         );
+      return vm->state;
+   }   
+   if(b_outlier_probability->o.type == BUZZTYPE_FLOAT) outlier_probability = b_outlier_probability->f.value;
+   else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "load_no_sensing_parameters: expected %s, got %s in second argument",
+                      buzztype_desc[BUZZTYPE_INT],
+                      buzztype_desc[b_outlier_probability->o.type]
+         );
+      return vm->state;
+   }    
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMNoSensing>(vm->robot)->LoadParameters(sensor_range, outlier_probability);
+   
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
 /************ Registration **************/
 /****************************************/
 
@@ -70,6 +111,10 @@ buzzvm_state BuzzSLAMNoSensing::RegisterSLAMFunctions(buzzvm_t buzz_vm) {
    /* Register mapping without sensing specific functions */
    buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "compute_fake_rendezvous_separator", 1));
    buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzComputeFakeRendezVousSeparator));
+   buzzvm_gstore(buzz_vm);
+
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "load_no_sensing_parameters", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzLoadNoSensingParameters));
    buzzvm_gstore(buzz_vm);
 
    return buzz_vm->state;
