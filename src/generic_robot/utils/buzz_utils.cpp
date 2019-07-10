@@ -272,8 +272,36 @@ static const char* buzz_error_info() {
 /****************************************/
 /****************************************/
 
+static int console_print(buzzvm_t vm) {
+   /* Push the vector components */
+   buzzvm_lload(vm, 1);
+   /* Retrieve parameters and check their types */
+   buzzobj_t b_msg = buzzvm_stack_at(vm, 1);
+   std::string msg;
+
+   if(b_msg->o.type == BUZZTYPE_STRING) {
+      msg = b_msg->s.value.str;
+   } else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "wrong parameter type for print."
+         );
+      return vm->state;
+   }
+
+   std::cout << msg << std::endl;   
+
+   return buzzvm_ret0(vm);
+}
+
+/****************************************/
+/****************************************/
+
 static int buzz_register_hooks() {
    buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(VM->robot)->RegisterSLAMFunctions(VM);
+   buzzvm_pushs(VM, buzzvm_string_register(VM, "print", 1));
+   buzzvm_pushcc(VM, buzzvm_function_register(VM, console_print));
+   buzzvm_gstore(VM);
    return BUZZVM_STATE_READY;
 }
 
