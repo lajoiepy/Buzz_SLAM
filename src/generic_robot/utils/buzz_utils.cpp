@@ -275,7 +275,10 @@ static const char* buzz_error_info() {
 static int console_print(buzzvm_t vm) {
    /* Push the vector components */
    buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
    /* Retrieve parameters and check their types */
+   buzzobj_t b_step = buzzvm_stack_at(vm, 2);
+   int step;
    buzzobj_t b_msg = buzzvm_stack_at(vm, 1);
    std::string msg;
 
@@ -288,8 +291,17 @@ static int console_print(buzzvm_t vm) {
          );
       return vm->state;
    }
+   if(b_step->o.type == BUZZTYPE_INT) {
+      step = b_step->i.value;
+   } else {
+      buzzvm_seterror(vm,
+                      BUZZVM_ERROR_TYPE,
+                      "wrong parameter type for print."
+         );
+      return vm->state;
+   }
 
-   std::cout << msg << std::endl;   
+   std::cout << step << " : " << msg << std::endl;   
 
    return buzzvm_ret0(vm);
 }
@@ -517,8 +529,6 @@ void buzz_script_step() {
    STREAM_SEND();
    /* Sleep */
    usleep(100000);
-   /* Print swarm */
-   buzzswarm_members_print(stdout, VM->swarmmembers, VM->robot);
    /* Check swarm state */
    int status = 1;
    buzzdict_foreach(VM->swarmmembers, check_swarm_members, &status);
