@@ -27,8 +27,6 @@ static int         TCP_LIST_STREAM = -1;
 static int         TCP_COMM_STREAM = -1;
 static uint8_t*    STREAM_SEND_BUF = NULL;
 
-#define TCP_LIST_STREAM_PORT "24580"
-
 /* Pointer to a function that sends a message on the stream */
 static void (*STREAM_SEND)() = NULL;
 
@@ -141,7 +139,7 @@ void buzz_stream_send_tcp() {
 /****************************************/
 /****************************************/
 
-int buzz_listen_tcp() {
+int buzz_listen_tcp(const char* port) {
    /* Used to store the return value of the network function calls */
    int retval;
    /* Get information on the available interfaces */
@@ -151,7 +149,7 @@ int buzz_listen_tcp() {
    hints.ai_socktype = SOCK_STREAM; /* TCP socket */
    hints.ai_flags = AI_PASSIVE;     /* Necessary for bind() later on */
    retval = getaddrinfo(NULL,
-                        TCP_LIST_STREAM_PORT,
+                        port,
                         &hints,
                         &ifaceinfo);
    if(retval != 0) {
@@ -190,7 +188,7 @@ int buzz_listen_tcp() {
       return 0;
    }
    /* Listen on the socket */
-   fprintf(stdout, "Listening on port " TCP_LIST_STREAM_PORT "...\n");
+   fprintf(stdout, "Listening on port %s...\n", port);
    if(listen(TCP_LIST_STREAM, 1) == -1) {
       close(TCP_LIST_STREAM);
       TCP_LIST_STREAM = -1;
@@ -228,7 +226,8 @@ int buzz_listen_bt() {
 }
 
 int buzz_listen(const char* type,
-                int msg_size) {
+                int msg_size,
+                const char* port) {
    /* Set the message size */
    MSG_SIZE = msg_size;
    /* Create the mutex */
@@ -239,7 +238,7 @@ int buzz_listen(const char* type,
    }
    /* Listen to connections */
    if(strcmp(type, "tcp") == 0)
-      return buzz_listen_tcp();
+      return buzz_listen_tcp(port);
    else if(strcmp(type, "bt") == 0)
       return buzz_listen_bt();
    return 0;
@@ -281,17 +280,15 @@ static int buzz_register_hooks() {
 /****************************************/
 /****************************************/
 
-int buzz_script_set(const char* bo_filename,
+int buzz_script_set(const int& robot_id, 
+                    const char* bo_filename,
                     const char* bdbg_filename) {
    /* Get hostname */
    char hstnm[30];
    gethostname(hstnm, 30);
-   /* Make numeric id from hostname */
-   /* NOTE: here we assume that the hostname is in the format Knn */
-   int id = strtol(hstnm + 1, NULL, 10);
    /* Reset the Buzz VM */
    if(VM) buzzvm_destroy(&VM);
-   VM = buzzvm_new(id);
+   VM = buzzvm_new(robot_id);
    /* Get rid of debug info */
    if(DBG_INFO) buzzdebug_destroy(&DBG_INFO);
    DBG_INFO = buzzdebug_new();

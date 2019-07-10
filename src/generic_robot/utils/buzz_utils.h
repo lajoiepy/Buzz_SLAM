@@ -4,9 +4,11 @@
 #include "../../slam/buzz_slam_singleton.h"
 
 extern int buzz_listen(const char* type,
-                       int msg_size);
+                       int msg_size,
+                       const char* port);
 
-extern int buzz_script_set(const char* bo_filename,
+extern int buzz_script_set(const int& robot_id, 
+                           const char* bo_filename,
                            const char* bdbg_filename);
 
 extern void buzz_script_step();
