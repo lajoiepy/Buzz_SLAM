@@ -52,20 +52,21 @@ void BuzzSLAM::Init(buzzvm_t buzz_vm) {
    adjacency_matrix_ = gtsam::zeros(number_of_robots_, number_of_robots_);
 
    // Delete existent log files
-   std::remove("log/datasets/centralized.g2o");
-   std::string log_file_name = "log/datasets/" + std::to_string(robot_id_) + ".g2o";
+   std::string log_file_name = log_folder_ + "centralized.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + ".g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_initial.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_optimized.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
+   std::remove(log_file_name.c_str());
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
    std::remove(log_file_name.c_str());
 
    InitOptimizer();
@@ -78,7 +79,7 @@ void BuzzSLAM::Init(buzzvm_t buzz_vm) {
 /****************************************/
 /****************************************/
 
-void BuzzSLAM::LoadParameters( const int& period, const int& number_of_steps_before_failsafe, const bool& use_pcm,
+void BuzzSLAM::LoadParameters( const std::string& log_folder, const int& period, const int& number_of_steps_before_failsafe, const bool& use_pcm,
                                                 const double& confidence_probability, const bool& incremental_solving, const int& debug,
                                                 const float& rotation_noise_std, const float& translation_noise_std,
                                                 const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
@@ -103,6 +104,7 @@ void BuzzSLAM::LoadParameters( const int& period, const int& number_of_steps_bef
    max_number_of_pose_estimation_steps_ = max_number_of_pose_estimation_steps;
 
    optimizer_period_ = period;
+   log_folder_ = log_folder;
 }
 
 /****************************************/
@@ -506,7 +508,7 @@ void BuzzSLAM::AddSeparatorToLocalGraph( const int& robot_1_id,
 /****************************************/
 
 void BuzzSLAM::WriteCurrentDataset() {
-   std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + ".g2o";
+   std::string dataset_file_name = log_folder_  + std::to_string(robot_id_) + ".g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
 }
 
@@ -514,9 +516,9 @@ void BuzzSLAM::WriteCurrentDataset() {
 /****************************************/
 
 void BuzzSLAM::WriteOptimizedDataset() {
-   std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
+   std::string dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_optimized.g2o";
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized_" + std::to_string(number_of_optimization_run_) + ".g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_optimized_" + std::to_string(number_of_optimization_run_) + ".g2o";
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
    number_of_optimization_run_++;
 }
@@ -525,17 +527,17 @@ void BuzzSLAM::WriteOptimizedDataset() {
 /****************************************/
 
 void BuzzSLAM::WriteInitialDataset() {
-   std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
+   std::string dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial.g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_" + std::to_string(number_of_optimization_run_) + ".g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_" + std::to_string(number_of_optimization_run_) + ".g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized.g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized.g2o";
    gtsam::writeG2o(*local_pose_graph_for_centralized_evaluation_, *poses_initial_guess_no_updates_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
    gtsam::writeG2o(*local_pose_graph_no_filtering_, *poses_initial_guess_no_updates_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_incremental.g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_incremental.g2o";
    gtsam::writeG2o(*local_pose_graph_for_centralized_evaluation_, *poses_initial_guess_centralized_incremental_updates_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
    gtsam::writeG2o(*local_pose_graph_no_filtering_, *poses_initial_guess_centralized_incremental_updates_, dataset_file_name);
 }
 
@@ -708,7 +710,7 @@ void BuzzSLAM::OutliersFiltering() {
          AbortOptimization(false);
       } else {
          total_outliers_rejected_ += number_of_measurements_rejected;
-         std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
+         std::string outliers_rejected_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
          std::ofstream outliers_rejected_file;
          outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
          outliers_rejected_file << number_of_measurements_rejected << "\n" ;

@@ -633,8 +633,10 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 14);
    buzzvm_lload(vm, 15);
    buzzvm_lload(vm, 16);
+   buzzvm_lload(vm, 17);
    /* Retrieve parameters and check their types */
-   buzzobj_t b_optimizer_period = buzzvm_stack_at(vm, 15);
+   buzzobj_t b_log_folder = buzzvm_stack_at(vm, 17);
+   buzzobj_t b_optimizer_period = buzzvm_stack_at(vm, 16);
    buzzobj_t b_max_steps_rotation = buzzvm_stack_at(vm, 15);
    buzzobj_t b_max_steps_pose = buzzvm_stack_at(vm, 14);
    buzzobj_t b_number_of_steps_before_failsafe = buzzvm_stack_at(vm, 13);
@@ -654,7 +656,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       rotation_estimate_change_threshold, pose_estimate_change_threshold;
    bool use_flagged_initialization, is_simulation, incremental_solving;
    int number_of_robots, debug_level;
-   std::string error_file_name;
+   std::string error_file_name, log_folder;
    double confidence_probability;
    bool use_pcm;
    int number_of_steps_before_failsafe;
@@ -669,6 +671,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_is_simulation->o.type == BUZZTYPE_INT &&
       b_number_of_robots->o.type == BUZZTYPE_INT &&
       b_error_file_name->o.type == BUZZTYPE_STRING &&
+      b_log_folder->o.type == BUZZTYPE_STRING &&
       b_debug->o.type == BUZZTYPE_INT &&
       b_incremental_solving->o.type == BUZZTYPE_INT &&
       b_confidence_probability->o.type == BUZZTYPE_FLOAT &&
@@ -687,6 +690,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       is_simulation = (bool) b_is_simulation->i.value;
       number_of_robots = b_number_of_robots->i.value;
       error_file_name = b_error_file_name->s.value.str;
+      log_folder = b_log_folder->s.value.str;
       debug_level = b_debug->i.value;
       incremental_solving = b_incremental_solving->i.value;
       confidence_probability = b_confidence_probability->f.value;
@@ -707,7 +711,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->LoadParameters(optimizer_period, number_of_steps_before_failsafe,
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->LoadParameters(log_folder, optimizer_period, number_of_steps_before_failsafe,
                      use_pcm, confidence_probability, incremental_solving, debug_level,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
