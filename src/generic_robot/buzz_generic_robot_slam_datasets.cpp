@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <chrono>
+#include <thread>
 
 static int done = 0;
 
@@ -69,8 +71,13 @@ int main(int argc, char** argv) {
    /* Set the Buzz bytecode */
    if(buzz_script_set(robot_id, bcfname, dbgfname)) {
       /* Main loop */
-      while(!done && !buzz_script_done())
+      int step = 0;
+      while(!done && !buzz_script_done()){
+         std::cout << "Buzz VM Step " << step << std::endl;
          buzz_script_step();
+         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+         step++;
+      }
       /* Cleanup */
       buzz_script_destroy();
    }

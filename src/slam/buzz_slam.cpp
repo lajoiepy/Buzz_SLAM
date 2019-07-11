@@ -226,7 +226,6 @@ void BuzzSLAM::SaveBackup() {
 /****************************************/
 
 void BuzzSLAM::AbortOptimization(const bool& log_info) {
-
    for (const auto& transform : robot_local_map_backup_.getTransforms().transforms) {
       if (robot_local_map_.getTransforms().transforms.find(transform.first) == robot_local_map_.getTransforms().transforms.end()) {
          gtsam::SharedNoiseModel model = gtsam::noiseModel::Gaussian::Covariance(transform.second.pose.covariance_matrix);
@@ -382,6 +381,9 @@ void BuzzSLAM::RemoveInactiveNeighbors() {
       neighbors_lowest_id_included_in_global_map_.erase(neighbor_id);
    }
    if (neighbors_within_communication_range_.empty()) {
+      if (debug_level_ > 1) {
+         std::cout << "Robot " <<  robot_id_ << " : Stop optimization, there are inactive neighbors." << std::endl;
+      }
       AbortOptimization(false);
    }
 }
@@ -883,6 +885,9 @@ void BuzzSLAM::UpdateNeighborRotationEstimates(const std::vector<std::vector<rot
                   optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
                }
             } else {
+               if (debug_level_ > 1) {
+                  std::cout << "Robot " <<  robot_id_ << " : Stop optimization. Key " << symbol.key() << " doesn't exist." << std::endl;
+               }
                AbortOptimization(false);
             }
          }
