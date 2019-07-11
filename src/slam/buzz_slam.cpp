@@ -875,7 +875,7 @@ void BuzzSLAM::UpdateNeighborRotationEstimates(const std::vector<std::vector<rot
          if (rotation_estimate.receiver_robot_id == robot_id_ &&
             neighbors_within_communication_range_.find(rotation_estimate.sender_robot_id) != neighbors_within_communication_range_.end()) {
             gtsam::Symbol symbol((unsigned char)(rotation_estimate.sender_robot_id+97), rotation_estimate.sender_pose_id);
-            if (other_robot_keys_for_optimization_.find(symbol.key()) != other_robot_keys_for_optimization_.end()) {
+            if (!use_pcm_ || other_robot_keys_for_optimization_.find(symbol.key()) != other_robot_keys_for_optimization_.end()) {
                gtsam::Vector rotation_matrix_vector(9);
                rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
                                        rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
