@@ -90,7 +90,10 @@ static int BuzzLoadDatasetParameters(buzzvm_t vm) {
 
 static int BuzzReadNextEntry(buzzvm_t vm) {
    buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(vm->robot)->AddOdometryMeasurement();
-   return buzzvm_ret0(vm);
+   int number_of_poses = buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(vm->robot)->GetNumberOfPoses();
+   
+   buzzvm_pushi(vm, number_of_poses);
+   return buzzvm_ret1(vm);
 } 
 
 /****************************************/
