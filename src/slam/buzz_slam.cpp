@@ -767,7 +767,6 @@ void BuzzSLAM::UpdateCurrentPoseEstimate(const int& pose_id) {
    buzzobj_t b_pose_estimate = buzzheap_newobj(buzz_vm_, BUZZTYPE_TABLE);
    auto pose_with_covariance = robot_local_map_.getTrajectory().trajectory_poses.at(gtsam::Symbol(robot_id_char_, pose_id).key()).pose;
    auto pose_matrix = pose_with_covariance.pose.matrix();
-   std::cout << "Send Pose " << gtsam::Symbol(robot_id_char_, pose_id).key() << " : estimate= " << pose_with_covariance.pose << std::endl;
    for (int i = 0; i < 4; i++) {
       for (int j = 0; j < 4; j++) {
          double matrix_elem = pose_matrix(i, j);
@@ -792,7 +791,6 @@ void BuzzSLAM::UpdatePoseEstimateFromNeighbor(const int& rid, const int& pose_id
    graph_utils::TrajectoryPose new_pose;
    new_pose.id = key;
    new_pose.pose = pose;
-   std::cout << "Recv Pose " << key << " : estimate= " << new_pose.pose.pose << std::endl;
    if (pose_estimates_from_neighbors_.find(rid) != pose_estimates_from_neighbors_.end()) {
       if (pose_estimates_from_neighbors_.at(rid).trajectory_poses.find(key) != pose_estimates_from_neighbors_.at(rid).trajectory_poses.end()) {
          pose_estimates_from_neighbors_.at(rid).trajectory_poses.at(key) = new_pose;
