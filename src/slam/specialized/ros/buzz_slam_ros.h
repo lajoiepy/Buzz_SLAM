@@ -7,7 +7,7 @@
 namespace buzz_slam {
 
 /*
-*  Buzz SLAM when measurements are read from datasets
+*  Buzz SLAM when measurements are given by the front end
 */
 class BuzzSLAMRos : public BuzzSLAM {
 
@@ -24,13 +24,9 @@ public:
 
    int AddSeparatorMeasurementOutlier();
 
-   void LoadParameters(const std::string& dataset_name, const double& sensor_range, const int& outlier_period);
+   void LoadParameters(const double& sensor_range, const int& outlier_period);
 
    virtual buzzvm_state RegisterSLAMFunctions(buzzvm_t buzz_vm);
-
-   bool KeyExists(const gtsam::Key& key);
-
-   gtsam::Pose3 GetPoseAtKey(const gtsam::Key& key);
 
    // Fake measurements generation
    void AddOdometryMeasurement();
@@ -45,12 +41,6 @@ private:
 
 protected:
 
-   virtual bool CompareCentralizedAndDecentralizedError();
-
-   void ComputeCentralizedEstimate(const std::string& centralized_extension);
-
-   void ComputeCentralizedEstimateIncremental(std::set<int> robots, const std::string& centralized_extension);
-
    virtual void WriteOptimizedDataset();
 
    std::set<std::pair<gtsam::Key, gtsam::Key>> AggregateOutliersKeys(const std::set<int>& robots);
@@ -63,11 +53,7 @@ protected:
 
 private:
 
-   // Information from the dataset
-   std::string dataset_name_;
-   boost::shared_ptr<gtsam::Values> dataset_values_;
-   std::map<std::pair<gtsam::Key, gtsam::Key>, boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>>> dataset_factors_;
-   std::map<gtsam::Key, std::pair<gtsam::Key, gtsam::Key>> loop_closure_linked_to_key_;
+   // Information for generate outliers
    gtsam::noiseModel::Isotropic::shared_ptr chordal_graph_noise_model_;
    gtsam::Matrix covariance_matrix_for_outlier_;
 
@@ -87,7 +73,6 @@ private:
    std::map<int, int> number_of_inliers_with_each_robot_, number_of_outliers_with_each_robot_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> inliers_keys_;
-   bool dataset_reading_ended_;
 
 };
 }

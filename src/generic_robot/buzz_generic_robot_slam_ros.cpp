@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <chrono>
 #include <thread>
+#include <ros/ros.h>
 
 static int done = 0;
 
@@ -72,11 +73,12 @@ int main(int argc, char** argv) {
    if(buzz_script_set<buzz_slam::BuzzSLAMRos>(robot_id, bcfname, dbgfname)) {
       /* Main loop */
       int step = 0;
-      while(!done && !buzz_script_done()){
+      while(!done && !buzz_script_done() && ros::ok()){
          std::cout << "Buzz VM Step " << step << std::endl;
          buzz_script_step();
          //std::this_thread::sleep_for(std::chrono::milliseconds(100));
          step++;
+         ros::spinOnce();
       }
       /* Cleanup */
       buzz_script_destroy();
