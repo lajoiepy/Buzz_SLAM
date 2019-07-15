@@ -8,6 +8,7 @@ cmake_minimum_required(VERSION 2.8.12)
 #
 option(ARGOS_SIMULATION "Build for ARGoS Simulation" ON)
 option(IRL_ROBOT "Build for IRL robot" ON)
+option(ROS_IRL_ROBOT "Build for IRL robot using ROS" ON)
 
 #
 # Find pkg-config
@@ -131,3 +132,34 @@ target_link_libraries(generic_robot_buzz_slam
   )
 install(TARGETS generic_robot_buzz_slam RUNTIME DESTINATION bin)
 endif(IRL_ROBOT)
+
+if(ROS_IRL_ROBOT)
+find_package(Buzz REQUIRED)
+include_directories(${CMAKE_SOURCE_DIR}/src ${BUZZ_C_INCLUDE_DIR})
+add_executable(generic_robot_buzz_slam_node
+  slam/utils/buzz_slam_utils.h
+  slam/buzz_slam.h
+  slam/buzz_slam.cpp
+  slam/buzz_slam_singleton.h
+  slam/buzz_slam_closures.cpp
+  slam/specialized/ros/buzz_slam_ros_closures.cpp
+  slam/specialized/ros/buzz_slam_ros.cpp
+  slam/specialized/ros/buzz_slam_ros.h
+  generic_robot/utils/buzz_utils.h
+  generic_robot/buzz_generic_robot_slam_ros.cpp)
+target_link_libraries(generic_robot_buzz_slam_node 
+  buzz
+  buzzdbg
+  gtsam
+  distributed_mapper
+  distributed_pcm
+  global_map_solver
+  fast_max-clique_finder
+  pairwise_consistency
+  robot_measurements
+  graph_utils
+  -lpthread
+  ${catkin_LIBRARIES}
+  )
+install(TARGETS generic_robot_buzz_slam_node RUNTIME DESTINATION bin)
+endif(ROS_IRL_ROBOT)
