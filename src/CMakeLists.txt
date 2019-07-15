@@ -114,7 +114,6 @@ add_executable(generic_robot_buzz_slam
   slam/specialized/dataset/buzz_slam_dataset_closures.cpp
   slam/specialized/dataset/buzz_slam_dataset.cpp
   slam/specialized/dataset/buzz_slam_dataset.h
-  generic_robot/utils/buzz_utils.cpp 
   generic_robot/utils/buzz_utils.h
   generic_robot/buzz_generic_robot_slam_datasets.cpp)
 target_link_libraries(generic_robot_buzz_slam 

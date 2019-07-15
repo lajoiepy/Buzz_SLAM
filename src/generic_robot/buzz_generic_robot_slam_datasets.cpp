@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
    signal(SIGINT, ctrlc_handler);
    /* Initialize the robot */
    /* Set the Buzz bytecode */
-   if(buzz_script_set(robot_id, bcfname, dbgfname)) {
+   if(buzz_script_set<buzz_slam::BuzzSLAMDataset>(robot_id, bcfname, dbgfname)) {
       /* Main loop */
       int step = 0;
       while(!done && !buzz_script_done()){
