@@ -74,45 +74,34 @@ void BuzzSLAMRos::LoadParameters(const double& sensor_range, const int& outlier_
 /****************************************/
 /****************************************/
 
-void BuzzSLAMRos::AddOdometryMeasurement() {
+void BuzzSLAMRos::AddOdometryMeasurement(const boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>>& odom_factor) {
    
    // Increase the number of poses
-   /*IncrementNumberOfPoses();
+   IncrementNumberOfPoses();
 
    // Next symbol
    gtsam::Symbol current_symbol = gtsam::Symbol(robot_id_char_, number_of_poses_);
+   // Add gaussian noise
+   auto measurement = odom_factor->measured();
 
-   // Initialize factor
-   if (dataset_factors_.count(std::make_pair(previous_symbol_, current_symbol)) != 0) {
-      auto new_factor = dataset_factors_.at(std::make_pair(previous_symbol_, current_symbol));
+   // Add new pose estimate into initial guesses
+   auto new_pose = poses_initial_guess_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+   poses_initial_guess_->insert(current_symbol.key(), new_pose);
+   auto new_pose_no_updates = poses_initial_guess_no_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+   poses_initial_guess_no_updates_->insert(current_symbol.key(), new_pose_no_updates);
+   auto new_pose_incremental = poses_initial_guess_centralized_incremental_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
+   poses_initial_guess_centralized_incremental_updates_->insert(current_symbol.key(), new_pose_incremental);
+   
+   // Update attributes
+   previous_symbol_ = current_symbol;
 
-      // Add gaussian noise
-      auto measurement = new_factor->measured();
+   // Add new factor to local pose graph
+   local_pose_graph_->push_back(odom_factor);
+   local_pose_graph_no_filtering_->push_back(odom_factor);
 
-      // Update attributes
-      auto new_pose = poses_initial_guess_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
-      auto new_pose_no_updates = poses_initial_guess_no_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
-      poses_initial_guess_no_updates_->insert(current_symbol.key(), new_pose_no_updates);
-      auto new_pose_incremental = poses_initial_guess_centralized_incremental_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
-      poses_initial_guess_centralized_incremental_updates_->insert(current_symbol.key(), new_pose_incremental);
-      
-      // Update attributes
-      previous_symbol_ = current_symbol;
-
-      // Add new factor to local pose graph
-      local_pose_graph_->push_back(new_factor);
-      local_pose_graph_no_filtering_->push_back(new_factor);
-
-      // Add new pose estimate into initial guess
-      poses_initial_guess_->insert(current_symbol.key(), new_pose);
-
-      // Add transform to local map for pairwise consistency maximization
-      auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(new_factor->noiseModel())->covariance();
-      robot_local_map_.addTransform(*new_factor, covariance_matrix);
-   } else {
-      number_of_poses_ --;
-      dataset_reading_ended_ = true;
-   }*/
+   // Add transform to local map for pairwise consistency maximization
+   auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(odom_factor->noiseModel())->covariance();
+   robot_local_map_.addTransform(*odom_factor, covariance_matrix);
 }
 
 /****************************************/
@@ -139,26 +128,20 @@ gtsam::Pose3 BuzzSLAMRos::OutlierMeasurement(const gtsam::Rot3& R, const gtsam::
 /****************************************/
 /****************************************/
 
-int BuzzSLAMRos::AddSeparatorMeasurement() {
-   /*if (loop_closure_linked_to_key_.count(previous_symbol_.key()) == 0) {
-      return 0;
-   }
-   // Separator symbols
-   auto loop_closure_keys = loop_closure_linked_to_key_.at(previous_symbol_.key());
+int BuzzSLAMRos::AddSeparatorMeasurement(const boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>>& separator_factor) {
 
-   AddNewKnownRobot(gtsam::Symbol(loop_closure_keys.first).chr());
-   AddNewKnownRobot(gtsam::Symbol(loop_closure_keys.second).chr());
+   AddNewKnownRobot(gtsam::Symbol(separator_factor->key1()).chr());
+   AddNewKnownRobot(gtsam::Symbol(separator_factor->key2()).chr());
 
    // Get factor or make it an outlier
-   boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>> new_factor = dataset_factors_.at(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
-   gtsam::Pose3 measurement = new_factor->measured();
+   gtsam::Pose3 measurement = separator_factor->measured();
    number_of_inliers_added_++;
 
-   auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(new_factor->noiseModel())->covariance();
-   UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
-                                          (int)(gtsam::Symbol(loop_closure_keys.second).chr() - 97),
-                                          gtsam::Symbol(loop_closure_keys.first).index(),
-                                          gtsam::Symbol(loop_closure_keys.second).index(),
+   auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(separator_factor->noiseModel())->covariance();
+   UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(separator_factor->key1()).chr() - 97),
+                                          (int)(gtsam::Symbol(separator_factor->key2()).chr() - 97),
+                                          gtsam::Symbol(separator_factor->key1()).index(),
+                                          gtsam::Symbol(separator_factor->key2()).index(),
                                           measurement.x(),
                                           measurement.y(),
                                           measurement.z(),
@@ -168,22 +151,22 @@ int BuzzSLAMRos::AddSeparatorMeasurement() {
                                           measurement.rotation().quaternion()[0],
                                           covariance_matrix );
 
-   inliers_keys_.insert(std::make_pair(loop_closure_keys.first, loop_closure_keys.second));
+   inliers_keys_.insert(std::make_pair(separator_factor->key1(), separator_factor->key2()));
 
    // Add new factor to local pose graph
-   local_pose_graph_->push_back(new_factor);
-   local_pose_graph_no_filtering_->push_back(new_factor);
+   local_pose_graph_->push_back(separator_factor);
+   local_pose_graph_no_filtering_->push_back(separator_factor);
 
    // Add transform to local map for pairwise consistency maximization
-   robot_local_map_.addTransform(*new_factor, covariance_matrix);
+   robot_local_map_.addTransform(*separator_factor, covariance_matrix);
    covariance_matrix_for_outlier_ = covariance_matrix;
 
    // Add info for flagged initialization
-   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.first).chr() - 97);
-   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
-   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.first).chr() - 97);
-   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
-   */
+   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(separator_factor->key1()).chr() - 97);
+   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(separator_factor->key2()).chr() - 97);
+   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(separator_factor->key1()).chr() - 97);
+   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(separator_factor->key2()).chr() - 97);
+   
    return 1;
 }
 
@@ -217,8 +200,8 @@ void BuzzSLAMRos::IncrementNumberOfInliersWithOtherRobot(const int& other_robot_
 /****************************************/
 
 int BuzzSLAMRos::AddSeparatorMeasurementOutlier() {
-   /*// Separator symbols
-   if (known_other_robots_.empty() || dataset_reading_ended_){
+   // Separator symbols
+   if (known_other_robots_.empty()){
       return 0;
    }
    auto random_id = std::floor(uniform_distribution_draw_outlier_(gen_outliers_) * number_of_robots_);
@@ -260,7 +243,7 @@ int BuzzSLAMRos::AddSeparatorMeasurementOutlier() {
 
    // Add info for flagged initialization
    IncrementNumberOfOutliersWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
-   */
+   
    return 1;
 }
 
