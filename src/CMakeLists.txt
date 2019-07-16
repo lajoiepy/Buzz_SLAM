@@ -136,6 +136,7 @@ endif(IRL_ROBOT)
 if(ROS_IRL_ROBOT)
 find_package(Buzz REQUIRED)
 include_directories(${CMAKE_SOURCE_DIR}/src ${BUZZ_C_INCLUDE_DIR})
+include_directories(${catkin_INCLUDE_DIRS})
 add_executable(generic_robot_buzz_slam_node
   slam/utils/buzz_slam_utils.h
   slam/buzz_slam.h
@@ -146,7 +147,9 @@ add_executable(generic_robot_buzz_slam_node
   slam/specialized/ros/buzz_slam_ros.cpp
   slam/specialized/ros/buzz_slam_ros.h
   generic_robot/utils/buzz_utils.h
+  generic_robot/message_handler_utils/message_handler_utils.h
   generic_robot/buzz_generic_robot_slam_ros.cpp)
+find_library(MULTIROBOT_SEPARATORS_LIBRARY multi_robot_separators HINTS /root/multi_robot_SLAM_separators/ros_ws/devel/lib)
 target_link_libraries(generic_robot_buzz_slam_node 
   buzz
   buzzdbg
@@ -160,6 +163,7 @@ target_link_libraries(generic_robot_buzz_slam_node
   graph_utils
   -lpthread
   ${catkin_LIBRARIES}
+  ${MULTIROBOT_SEPARATORS_LIBRARY}
   )
 install(TARGETS generic_robot_buzz_slam_node RUNTIME DESTINATION bin)
 endif(ROS_IRL_ROBOT)

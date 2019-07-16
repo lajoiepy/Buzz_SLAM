@@ -74,15 +74,13 @@ void BuzzSLAMRos::LoadParameters(const double& sensor_range, const int& outlier_
 /****************************************/
 /****************************************/
 
-void BuzzSLAMRos::AddOdometryMeasurement(const boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>>& odom_factor) {
+void BuzzSLAMRos::AddOdometryMeasurement(const gtsam::Pose3& measurement, const gtsam::Matrix covariance) {
    
    // Increase the number of poses
    IncrementNumberOfPoses();
 
    // Next symbol
    gtsam::Symbol current_symbol = gtsam::Symbol(robot_id_char_, number_of_poses_);
-   // Add gaussian noise
-   auto measurement = odom_factor->measured();
 
    // Add new pose estimate into initial guesses
    auto new_pose = poses_initial_guess_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
@@ -91,81 +89,54 @@ void BuzzSLAMRos::AddOdometryMeasurement(const boost::shared_ptr<gtsam::BetweenF
    poses_initial_guess_no_updates_->insert(current_symbol.key(), new_pose_no_updates);
    auto new_pose_incremental = poses_initial_guess_centralized_incremental_updates_->at<gtsam::Pose3>(previous_symbol_.key()) * measurement;
    poses_initial_guess_centralized_incremental_updates_->insert(current_symbol.key(), new_pose_incremental);
-   
+
+   // Add new factor to local pose graph
+   gtsam::SharedNoiseModel noise_model = gtsam::noiseModel::Gaussian::Covariance(covariance);
+   gtsam::BetweenFactor<gtsam::Pose3> new_factor = 
+            gtsam::BetweenFactor<gtsam::Pose3>(previous_symbol_, current_symbol, measurement, noise_model);
+   local_pose_graph_->push_back(new_factor);
+   local_pose_graph_no_filtering_->push_back(new_factor);
+
+   // Add transform to local map for pairwise consistency maximization
+   robot_local_map_.addTransform(new_factor, covariance);
+
    // Update attributes
    previous_symbol_ = current_symbol;
 
-   // Add new factor to local pose graph
-   local_pose_graph_->push_back(odom_factor);
-   local_pose_graph_no_filtering_->push_back(odom_factor);
-
-   // Add transform to local map for pairwise consistency maximization
-   auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(odom_factor->noiseModel())->covariance();
-   robot_local_map_.addTransform(*odom_factor, covariance_matrix);
+   WriteCurrentDataset(); // TODO : remove
 }
 
 /****************************************/
 /****************************************/
 
-gtsam::Pose3 BuzzSLAMRos::OutlierMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t) {
-   
-   // TODO: Add option to add noise greater than 3 or 5 sigmas, instead of totally random measurment
-   // This is why this method takes the measurement in parameter.
-   gtsam::Point3 t_outlier = {   uniform_distribution_outliers_translation_(gen_outliers_),  
-                                 uniform_distribution_outliers_translation_(gen_outliers_),
-                                 uniform_distribution_outliers_translation_(gen_outliers_) };
+int BuzzSLAMRos::AddSeparatorMeasurement(const gtsam::BetweenFactor<gtsam::Pose3>& separator_factor) {
 
-
-   gtsam::Rot3 R_outlier = gtsam::Rot3::Ypr( uniform_distribution_outliers_rotation_(gen_outliers_), 
-                                             uniform_distribution_outliers_rotation_(gen_outliers_),
-                                             uniform_distribution_outliers_rotation_(gen_outliers_));
-
-   number_of_outliers_added_++;
-
-   return gtsam::Pose3(R_outlier, t_outlier);
-}
-
-/****************************************/
-/****************************************/
-
-int BuzzSLAMRos::AddSeparatorMeasurement(const boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>>& separator_factor) {
-
-   AddNewKnownRobot(gtsam::Symbol(separator_factor->key1()).chr());
-   AddNewKnownRobot(gtsam::Symbol(separator_factor->key2()).chr());
+   AddNewKnownRobot(gtsam::Symbol(separator_factor.key1()).chr());
+   AddNewKnownRobot(gtsam::Symbol(separator_factor.key2()).chr());
 
    // Get factor or make it an outlier
-   gtsam::Pose3 measurement = separator_factor->measured();
+   gtsam::Pose3 measurement = separator_factor.measured();
    number_of_inliers_added_++;
 
-   auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(separator_factor->noiseModel())->covariance();
-   UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(separator_factor->key1()).chr() - 97),
-                                          (int)(gtsam::Symbol(separator_factor->key2()).chr() - 97),
-                                          gtsam::Symbol(separator_factor->key1()).index(),
-                                          gtsam::Symbol(separator_factor->key2()).index(),
-                                          measurement.x(),
-                                          measurement.y(),
-                                          measurement.z(),
-                                          measurement.rotation().quaternion()[1],
-                                          measurement.rotation().quaternion()[2],
-                                          measurement.rotation().quaternion()[3],
-                                          measurement.rotation().quaternion()[0],
-                                          covariance_matrix );
+   auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(separator_factor.noiseModel())->covariance();
 
-   inliers_keys_.insert(std::make_pair(separator_factor->key1(), separator_factor->key2()));
+   inliers_keys_.insert(std::make_pair(separator_factor.key1(), separator_factor.key2()));
 
    // Add new factor to local pose graph
    local_pose_graph_->push_back(separator_factor);
    local_pose_graph_no_filtering_->push_back(separator_factor);
 
    // Add transform to local map for pairwise consistency maximization
-   robot_local_map_.addTransform(*separator_factor, covariance_matrix);
+   robot_local_map_.addTransform(separator_factor, covariance_matrix);
    covariance_matrix_for_outlier_ = covariance_matrix;
 
    // Add info for flagged initialization
-   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(separator_factor->key1()).chr() - 97);
-   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(separator_factor->key2()).chr() - 97);
-   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(separator_factor->key1()).chr() - 97);
-   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(separator_factor->key2()).chr() - 97);
+   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(separator_factor.key1()).chr() - 97);
+   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(separator_factor.key2()).chr() - 97);
+   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(separator_factor.key1()).chr() - 97);
+   IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(separator_factor.key2()).chr() - 97);
+
+   WriteCurrentDataset(); // TODO : remove
    
    return 1;
 }
@@ -194,6 +165,27 @@ void BuzzSLAMRos::IncrementNumberOfInliersWithOtherRobot(const int& other_robot_
          number_of_inliers_with_each_robot_[other_robot_id] = number_of_inliers_with_each_robot_[other_robot_id] + 1;
       }
    }
+}
+
+/****************************************/
+/****************************************/
+
+gtsam::Pose3 BuzzSLAMRos::OutlierMeasurement(const gtsam::Rot3& R, const gtsam::Point3& t) {
+   
+   // TODO: Add option to add noise greater than 3 or 5 sigmas, instead of totally random measurment
+   // This is why this method takes the measurement in parameter.
+   gtsam::Point3 t_outlier = {   uniform_distribution_outliers_translation_(gen_outliers_),  
+                                 uniform_distribution_outliers_translation_(gen_outliers_),
+                                 uniform_distribution_outliers_translation_(gen_outliers_) };
+
+
+   gtsam::Rot3 R_outlier = gtsam::Rot3::Ypr( uniform_distribution_outliers_rotation_(gen_outliers_), 
+                                             uniform_distribution_outliers_rotation_(gen_outliers_),
+                                             uniform_distribution_outliers_rotation_(gen_outliers_));
+
+   number_of_outliers_added_++;
+
+   return gtsam::Pose3(R_outlier, t_outlier);
 }
 
 /****************************************/

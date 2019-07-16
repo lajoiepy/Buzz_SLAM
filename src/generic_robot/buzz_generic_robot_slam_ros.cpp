@@ -1,76 +1,143 @@
 #include <buzz/buzzasm.h>
 #include "utils/buzz_utils.h"
+#include "message_handler_utils/message_handler_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
 #include <chrono>
 #include <thread>
-#include <ros/ros.h>
 
 static int done = 0;
-
-/*
- * Print usage information
- */
-void usage(const char* path, int status) {
-   fprintf(stderr, "Usage:\n");
-   fprintf(stderr, "\t%s <stream> <msg_size> <file.bo> <file.bdb>\n\n", path);
-   fprintf(stderr, "== Options ==\n\n");
-   fprintf(stderr, "  stream        The stream type: tcp or bt\n");
-   fprintf(stderr, "  msg_size      The message size in bytes\n");
-   fprintf(stderr, "  file.bo       The Buzz bytecode file\n");
-   fprintf(stderr, "  file.bdbg     The Buzz debug file\n\n");
-   fprintf(stderr, "  robot_id     The ID Buzz assigned to the Buzz VM (should start from 0)\n\n");
-   fprintf(stderr, "  port     The port number to use\n\n");
-   exit(status);
-}
+static graph_utils::PoseWithCovariance accumulated_measurement_;
+static double rotation_std_, translation_std_;
+static int next_robot_id_; // TODO: This only works in the 3 robots case where the sender/receivers are preassigned
 
 static void ctrlc_handler(int sig) {
    done = 1;
 }
 
+static void add_odometry(const rtabmap_ros::OdomInfo::ConstPtr &msg)
+{
+   // Fill the received transform with the converted pose and covariance
+   graph_utils::PoseWithCovariance measurement;
+   transform_to_pose3(msg->transform, measurement.pose);
+   covariance_to_matrix(msg->covariance, measurement.covariance_matrix);
+
+   // Accumulate the transforms
+   poseCompose(accumulated_measurement_,
+               measurement,
+               accumulated_measurement_);
+
+   // Add a node if the current frame is a keyframe
+   if (msg->keyFrameAdded)
+   {
+      set_covariance_matrix(accumulated_measurement_.covariance_matrix, rotation_std_, translation_std_);
+
+      buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->AddOdometryMeasurement(accumulated_measurement_.pose, accumulated_measurement_.covariance_matrix);
+   }
+}
+
+static bool add_separators(multi_robot_separators::ReceiveSeparators::Request &req,
+                          multi_robot_separators::ReceiveSeparators::Response &res)
+{
+   for (int idx = 0; idx < req.matched_ids_from.size(); idx++)
+   {
+      gtsam::Symbol robot_symbol_from;
+      gtsam::Symbol robot_symbol_to;
+      // Case where the robot computing the separator is saving is to the pose graph
+      if (VM->robot == req.robot_computed_transform_id)
+      {
+         // local robot goes with matched other since message comes from the sending robot
+         robot_symbol_from = gtsam::Symbol(VM->robot, req.matched_ids_from[idx]);
+         robot_symbol_to = gtsam::Symbol(next_robot_id_, req.matched_ids_to[idx]); 
+      }
+
+      // Case where the robot is receiving the separator computed by another robot
+      else
+      {
+         // local robot goes with matched local since it computed the matches
+         robot_symbol_to = gtsam::Symbol(VM->robot, req.matched_ids_to[idx]);
+         robot_symbol_from = gtsam::Symbol('a' + req.robot_computed_transform_id, req.matched_ids_from[idx]);
+      }
+
+      gtsam::Pose3 measurement;
+      pose_ros_to_gtsam(req.separators[idx].pose, measurement);
+
+      gtsam::Matrix covariance_matrix;
+      set_covariance_matrix(covariance_matrix, rotation_std_, translation_std_);
+
+      gtsam::SharedNoiseModel noise_model = gtsam::noiseModel::Gaussian::Covariance(covariance_matrix);
+
+      gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_symbol_from, robot_symbol_to, measurement, noise_model);
+      buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->AddSeparatorMeasurement(new_factor);
+   }
+   res.success = true;
+   return true;
+}
+
 int main(int argc, char** argv) {
-   /* Parse command line */
-   if(argc != 7) usage(argv[0], 0);
-   /* The stream type */
-   char* stream = argv[1];
-   if(strcmp(stream, "tcp") != 0 &&
-      strcmp(stream, "bt") != 0) {
-      fprintf(stderr, "%s: unknown stream type '%s'\n", argv[0], stream);
-      usage(argv[0], 0);
-   }
-   /* The message size */
-   char* endptr;
-   int msg_sz = strtol(argv[2], &endptr, 10);
-   if(endptr == argv[2] || *endptr != '\0') {
-      fprintf(stderr, "%s: can't parse '%s' into a number\n", argv[0], argv[2]);
-      return 0;
-   }
-   if(msg_sz <= 0) {
-      fprintf(stderr, "%s: invalid value %d for message size\n", argv[0], msg_sz);
-      return 0;
-   }
-   /* The bytecode filename */
-   char* bcfname = argv[3];
-   /* The debugging information file name */
-   char* dbgfname = argv[4];
-   /* The robot id */
-   int robot_id = strtol(argv[5], &endptr, 10);
-   if(endptr == argv[5] || *endptr != '\0') {
-      fprintf(stderr, "%s: can't parse '%s' into a number\n", argv[0], argv[5]);
-      return 0;
-   }
-   /* The port to use */
-   char* port = argv[6];
+   // Intialization
+   ros::init( argc, argv, "buzz_generic_robot_slam_ros" );
+   ros::NodeHandle nh_;
+
+   // Parse parameters
+   int msg_sz;
+   if (!nh_.getParam("/"+ros::this_node::getName()+"/message_size", msg_sz))
+  	{
+  		msg_sz = 100000;
+  	}
+
+   std::string buzz_script_name, bcfname, dbgfname;
+   if (!nh_.getParam("/"+ros::this_node::getName()+"/buzz_script_name", buzz_script_name))
+  	{
+  		buzz_script_name = "";
+      ROS_ERROR("You must specify a Buzz script to execute.");
+  	}
+   bcfname = buzz_script_name + ".bo";
+   dbgfname = buzz_script_name + ".bdb";
+
+   int robot_id;
+   if (!nh_.getParam("/"+ros::this_node::getName()+"/robot_id", robot_id))
+  	{
+  		robot_id = 0;
+  	}
+
+   std::string port;
+   if (!nh_.getParam("/"+ros::this_node::getName()+"/port", port))
+  	{
+  		port = "24580";
+  	}
+   
+   if (!nh_.getParam("/"+ros::this_node::getName()+"/next_robot_id", next_robot_id_))
+  	{
+  		next_robot_id_ = (robot_id + 1) % 3;
+  	}
+
+   if (!nh_.getParam("/"+ros::this_node::getName()+"/rotation_std", rotation_std_))
+  	{
+  		rotation_std_ = 0.01;
+  	}
+   
+   if (!nh_.getParam("/"+ros::this_node::getName()+"/translation_std", translation_std_))
+  	{
+  		translation_std_ = 0.1;
+  	}
 
    /* Wait for connection */
-   if(!buzz_listen(stream, msg_sz, port)) return 1;
+   if(!buzz_listen("tcp", msg_sz, port.c_str())) return 1;
    /* Set CTRL-C handler */
    signal(SIGTERM, ctrlc_handler);
    signal(SIGINT, ctrlc_handler);
-   /* Initialize the robot */
+
    /* Set the Buzz bytecode */
-   if(buzz_script_set<buzz_slam::BuzzSLAMRos>(robot_id, bcfname, dbgfname)) {
+   if(buzz_script_set<buzz_slam::BuzzSLAMRos>(robot_id, bcfname.c_str(), dbgfname.c_str())) {
+
+      /* Initialize the ROS subcribers */
+      accumulated_measurement_.pose = gtsam::Pose3();
+      accumulated_measurement_.covariance_matrix = gtsam::eye(6,6);
+      ros::Subscriber sub_odom = nh_.subscribe("odom_info", 1000, &add_odometry);
+      ros::ServiceServer s_add_separators = nh_.advertiseService("add_separators_pose_graph", &add_separators);
+
       /* Main loop */
       int step = 0;
       while(!done && !buzz_script_done() && ros::ok()){

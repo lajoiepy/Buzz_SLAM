@@ -19,7 +19,7 @@ public:
 
    virtual void Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt);
 
-   int AddSeparatorMeasurement(const boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>>& separator_factor);
+   int AddSeparatorMeasurement(const gtsam::BetweenFactor<gtsam::Pose3>& separator_factor);
 
    int AddSeparatorMeasurementOutlier();
 
@@ -27,7 +27,7 @@ public:
 
    virtual buzzvm_state RegisterSLAMFunctions(buzzvm_t buzz_vm);
 
-   void AddOdometryMeasurement(const boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>>& odom_factor);
+   void AddOdometryMeasurement(const gtsam::Pose3& measurement, const gtsam::Matrix covariance);
    
 private:
 
