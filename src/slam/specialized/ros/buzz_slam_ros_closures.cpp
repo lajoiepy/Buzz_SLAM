@@ -20,7 +20,7 @@ static int BuzzAddSeparatorOutlier(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-static int BuzzLoadDatasetParameters(buzzvm_t vm) {
+static int BuzzLoadRosParameters(buzzvm_t vm) {
    /* Push the vector components */
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
@@ -69,8 +69,8 @@ buzzvm_state BuzzSLAMRos::RegisterSLAMFunctions(buzzvm_t buzz_vm) {
    buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "add_separator_outlier", 1));
    buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzAddSeparatorOutlier));
    buzzvm_gstore(buzz_vm);
-   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "load_dataset_parameters", 1));
-   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzLoadDatasetParameters));
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "load_ros_parameters", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzLoadRosParameters));
    buzzvm_gstore(buzz_vm);
 
    return buzz_vm->state;
