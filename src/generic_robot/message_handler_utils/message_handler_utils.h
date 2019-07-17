@@ -16,6 +16,7 @@ void transform_to_pose3(const geometry_msgs::Transform &msg, gtsam::Pose3 &pose3
 
 void covariance_to_matrix(const boost::array<double, 36ul> &msg, gtsam::Matrix &cov_mat_out)
 {
+    cov_mat_out = gtsam::zeros(6,6);
     for (int row = 0; row < 6; row++)
     {
         for (int col = 0; col < 6; col++)
@@ -58,6 +59,7 @@ void pose_with_covariance_from_msg(const geometry_msgs::PoseWithCovariance& msg,
     
     pose.pose = gtsam::Pose3(rotation, translation);
 
+    pose.covariance_matrix = gtsam::zeros(6,6);
     for (int i = 0; i < 6; i++) {
         for (int j = 0; j < 6; j++) {
             pose.covariance_matrix(i, j) = msg.covariance[i*6 + j];
