@@ -75,6 +75,21 @@ static bool add_separators(multi_robot_separators::ReceiveSeparators::Request &r
    return true;
 }
 
+static bool get_pose_estimates(multi_robot_separators::PoseEstimates::Request &req,
+                          multi_robot_separators::PoseEstimates::Response &res)
+{
+   std::vector<geometry_msgs::PoseWithCovariance> pose_estimates;
+   for (const auto pose_id : req.pose_ids)
+   {
+      auto pose_estimate = buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->GetPoseEstimateAtID(pose_id);
+      geometry_msgs::PoseWithCovariance pose_estimate_msg;
+      pose_with_covariance_to_msg(pose_estimate, pose_estimate_msg);
+      pose_estimates.emplace_back(pose_estimate_msg);
+   }
+   res.pose_estimates = pose_estimates;
+   return true;
+}
+
 int main(int argc, char** argv) {
    // Intialization
    ros::init( argc, argv, "buzz_generic_robot_slam_ros" );

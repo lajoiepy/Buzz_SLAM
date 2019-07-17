@@ -28,6 +28,8 @@ public:
    virtual buzzvm_state RegisterSLAMFunctions(buzzvm_t buzz_vm);
 
    void AddOdometryMeasurement(const gtsam::Pose3& measurement, const gtsam::Matrix covariance);
+
+   graph_utils::PoseWithCovariance GetPoseEstimateAtID(const int& pose_id);
    
 private:
 

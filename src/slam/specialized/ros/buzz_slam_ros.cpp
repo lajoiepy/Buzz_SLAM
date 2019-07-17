@@ -350,6 +350,14 @@ std::pair<int, int> BuzzSLAMRos::CountInliersAndOutliers(const std::set<int>& ro
 /****************************************/
 /****************************************/
 
+graph_utils::PoseWithCovariance BuzzSLAMRos::GetPoseEstimateAtID(const int& pose_id) {
+   auto pose_with_covariance = robot_local_map_.getTrajectory().trajectory_poses.at(gtsam::Symbol(robot_id_char_, pose_id).key()).pose;
+   return pose_with_covariance;
+}
+
+/****************************************/
+/****************************************/
+
 void BuzzSLAMRos::AbortOptimization(const bool& log_info){
    BuzzSLAM::AbortOptimization(log_info);
    if (log_info) {
