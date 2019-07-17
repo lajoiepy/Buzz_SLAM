@@ -51,6 +51,20 @@ void pose_with_covariance_to_msg(const graph_utils::PoseWithCovariance& pose, ge
     }
 }
 
+void pose_with_covariance_from_msg(const geometry_msgs::PoseWithCovariance& msg, graph_utils::PoseWithCovariance &pose)
+{
+    gtsam::Rot3 rotation(msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z);
+    gtsam::Point3 translation(msg.pose.position.x, msg.pose.position.y, msg.pose.position.z);
+    
+    pose.pose = gtsam::Pose3(rotation, translation);
+
+    for (int i = 0; i < 6; i++) {
+        for (int j = 0; j < 6; j++) {
+            pose.covariance_matrix(i, j) = msg.covariance[i*6 + j];
+        }
+    }
+}
+
 void set_covariance_matrix(gtsam::Matrix &covariance_matrix, const double& rotation_std, const double& translation_std)
 {
     covariance_matrix = gtsam::zeros(6,6);

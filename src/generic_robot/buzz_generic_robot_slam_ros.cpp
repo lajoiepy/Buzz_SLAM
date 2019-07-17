@@ -44,21 +44,10 @@ static bool add_separators(multi_robot_separators::ReceiveSeparators::Request &r
    {
       gtsam::Symbol robot_symbol_from;
       gtsam::Symbol robot_symbol_to;
-      // Case where the robot computing the separator is saving is to the pose graph
-      if (VM->robot == req.robot_computed_transform_id)
-      {
-         // local robot goes with matched other since message comes from the sending robot
-         robot_symbol_from = gtsam::Symbol(VM->robot, req.matched_ids_from[idx]);
-         robot_symbol_to = gtsam::Symbol(next_robot_id_, req.matched_ids_to[idx]); 
-      }
-
-      // Case where the robot is receiving the separator computed by another robot
-      else
-      {
-         // local robot goes with matched local since it computed the matches
-         robot_symbol_to = gtsam::Symbol(VM->robot, req.matched_ids_to[idx]);
-         robot_symbol_from = gtsam::Symbol('a' + req.robot_computed_transform_id, req.matched_ids_from[idx]);
-      }
+      
+      // local robot goes with matched local since it computed the matches
+      robot_symbol_from = gtsam::Symbol('a' + req.robot_from_id, req.matched_ids_from[idx]);
+      robot_symbol_to = gtsam::Symbol('a' + req.robot_to_id, req.matched_ids_to[idx]);
 
       gtsam::Pose3 measurement;
       pose_ros_to_gtsam(req.separators[idx].pose, measurement);
@@ -70,6 +59,16 @@ static bool add_separators(multi_robot_separators::ReceiveSeparators::Request &r
 
       gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_symbol_from, robot_symbol_to, measurement, noise_model);
       buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->AddSeparatorMeasurement(new_factor);
+
+      if (VM->robot == req.robot_from_id) {
+         graph_utils::PoseWithCovariance pose;
+         pose_with_covariance_from_msg(req.pose_estimates_to[idx], pose);
+         buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->UpdatePoseEstimateFromNeighbor(req.robot_to_id, req.matched_ids_to[idx], pose);
+      } else if (VM->robot == req.robot_to_id) {
+         graph_utils::PoseWithCovariance pose;
+         pose_with_covariance_from_msg(req.pose_estimates_from[idx], pose);
+         buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->UpdatePoseEstimateFromNeighbor(req.robot_from_id, req.matched_ids_from[idx], pose);
+      }
    }
    res.success = true;
    return true;
@@ -152,6 +151,7 @@ int main(int argc, char** argv) {
       accumulated_measurement_.covariance_matrix = gtsam::eye(6,6);
       ros::Subscriber sub_odom = nh_.subscribe("odom_info", 1000, &add_odometry);
       ros::ServiceServer s_add_separators = nh_.advertiseService("add_separators_pose_graph", &add_separators);
+      ros::ServiceServer s_get_pose_estimates = nh_.advertiseService("get_pose_estimates", &get_pose_estimates);
 
       /* Main loop */
       int step = 0;
