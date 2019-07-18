@@ -104,8 +104,6 @@ void BuzzSLAMRos::AddOdometryMeasurement(const gtsam::Pose3& measurement, const 
 
    // Update attributes
    previous_symbol_ = current_symbol;
-
-   WriteCurrentDataset(); // TODO : remove
 }
 
 /****************************************/
@@ -137,8 +135,6 @@ int BuzzSLAMRos::AddSeparatorMeasurement(const gtsam::BetweenFactor<gtsam::Pose3
    IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(separator_factor.key2()).chr() - 97);
    IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(separator_factor.key1()).chr() - 97);
    IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(separator_factor.key2()).chr() - 97);
-
-   WriteCurrentDataset(); // TODO : remove
    
    return 1;
 }
