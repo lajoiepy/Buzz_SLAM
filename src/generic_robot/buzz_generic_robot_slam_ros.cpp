@@ -58,7 +58,7 @@ static bool add_separators(multi_robot_separators::ReceiveSeparators::Request &r
 
       gtsam::SharedNoiseModel noise_model = gtsam::noiseModel::Gaussian::Covariance(covariance_matrix);
 
-      ROS_INFO("Add separator, Keys: ", robot_symbol_from.key(), ", ", robot_symbol_to.key());
+      ROS_INFO("Add separator, %llu, %llu", robot_symbol_from.key(), robot_symbol_to.key());
       gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_symbol_from, robot_symbol_to, measurement, noise_model);
       buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->AddSeparatorMeasurement(new_factor);
 
@@ -157,12 +157,8 @@ int main(int argc, char** argv) {
       ros::ServiceServer s_get_pose_estimates = nh_.advertiseService("get_pose_estimates", &get_pose_estimates);
 
       /* Main loop */
-      int step = 0;
       while(!done && !buzz_script_done() && ros::ok()){
-         std::cout << "Buzz VM Step " << step << std::endl;
          buzz_script_step();
-         //std::this_thread::sleep_for(std::chrono::milliseconds(100));
-         step++;
          ros::spinOnce();
       }
       /* Cleanup */
