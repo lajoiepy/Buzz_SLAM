@@ -30,6 +30,10 @@ public:
    void AddOdometryMeasurement(const gtsam::Pose3& measurement, const gtsam::Matrix covariance);
 
    graph_utils::PoseWithCovariance GetPoseEstimateAtID(const int& pose_id);
+
+   bool GetStartOptimizationTriggered();
+
+   void TriggerOptimization();
    
 private:
 
@@ -65,7 +69,7 @@ private:
                                     uniform_distribution_outliers_rotation_,
                                     uniform_distribution_draw_outlier_;
 
-   // Current state of the simulation
+   // Current state
    int number_of_outliers_added_;
    int number_of_inliers_added_;
    double sensor_range_;
@@ -73,6 +77,9 @@ private:
    std::map<int, int> number_of_inliers_with_each_robot_, number_of_outliers_with_each_robot_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys_;
    std::set<std::pair<gtsam::Key, gtsam::Key>> inliers_keys_;
+   
+   // Control variable
+   bool start_optimization_triggered_;
 
 };
 }

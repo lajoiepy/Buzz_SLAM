@@ -61,6 +61,8 @@ void BuzzSLAMRos::Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam:
    std::remove(log_file_name.c_str());
    log_file_name = log_folder_  + std::to_string(robot_id_) + "_reference_frame.g2o";
    std::remove(log_file_name.c_str());
+
+   start_optimization_triggered_ = false;
 }
 
 /****************************************/
@@ -139,6 +141,20 @@ int BuzzSLAMRos::AddSeparatorMeasurement(const gtsam::BetweenFactor<gtsam::Pose3
    WriteCurrentDataset(); // TODO : remove
    
    return 1;
+}
+
+/****************************************/
+/****************************************/
+
+bool BuzzSLAMRos::GetStartOptimizationTriggered() {
+   return start_optimization_triggered_;
+}
+
+/****************************************/
+/****************************************/
+
+void BuzzSLAMRos::TriggerOptimization() {
+   start_optimization_triggered_ = true;
 }
 
 /****************************************/
@@ -272,6 +288,8 @@ void BuzzSLAMRos::WriteOptimizedDataset() {
    reference_frame_file.open(reference_frame_file_name, std::ios::trunc);
    reference_frame_file << lowest_id_included_in_global_map_ << "\n" ;
    reference_frame_file.close();
+
+   start_optimization_triggered_ = false;
 }
 
 /****************************************/

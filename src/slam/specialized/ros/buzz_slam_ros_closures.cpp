@@ -59,6 +59,20 @@ static int BuzzLoadRosParameters(buzzvm_t vm) {
 } 
 
 /****************************************/
+/****************************************/
+
+static int BuzzStartOptimizationTriggered(buzzvm_t vm) {
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   bool start_triggered = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMRos>(vm->robot)->GetStartOptimizationTriggered();
+   buzzvm_pushi(vm, start_triggered);
+
+   return buzzvm_ret1(vm);
+}
+
+/****************************************/
 /************ Registration **************/
 /****************************************/
 
@@ -71,6 +85,9 @@ buzzvm_state BuzzSLAMRos::RegisterSLAMFunctions(buzzvm_t buzz_vm) {
    buzzvm_gstore(buzz_vm);
    buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "load_ros_parameters", 1));
    buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzLoadRosParameters));
+   buzzvm_gstore(buzz_vm);
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "start_optimization_triggered", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzStartOptimizationTriggered));
    buzzvm_gstore(buzz_vm);
 
    return buzz_vm->state;

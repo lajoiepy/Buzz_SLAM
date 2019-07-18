@@ -1,6 +1,7 @@
 #include <buzz/buzzasm.h>
 #include "utils/buzz_utils.h"
 #include "message_handler_utils/message_handler_utils.h"
+#include <std_srvs/Empty.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
@@ -35,6 +36,7 @@ static void add_odometry(const rtabmap_ros::OdomInfo::ConstPtr &msg)
 
       buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->AddOdometryMeasurement(accumulated_measurement_.pose, accumulated_measurement_.covariance_matrix);
       ROS_INFO("Add odometry measurement");
+      accumulated_measurement_.pose = gtsam::Pose3();
    }
 }
 
@@ -89,6 +91,12 @@ static bool get_pose_estimates(multi_robot_separators::PoseEstimates::Request &r
       pose_estimates.emplace_back(pose_estimate_msg);
    }
    res.pose_estimates = pose_estimates;
+   return true;
+}
+
+static bool trigger_optimization(std_srvs::Empty::Request  &req,
+                                 std_srvs::Empty::Response &res) {
+   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->TriggerOptimization();
    return true;
 }
 
@@ -155,6 +163,7 @@ int main(int argc, char** argv) {
       ros::Subscriber sub_odom = nh_.subscribe("odom_info", 1000, &add_odometry);
       ros::ServiceServer s_add_separators = nh_.advertiseService("add_separators_pose_graph", &add_separators);
       ros::ServiceServer s_get_pose_estimates = nh_.advertiseService("get_pose_estimates", &get_pose_estimates);
+      ros::ServiceServer s_trigger_optimization = nh_.advertiseService("start_optimization", &trigger_optimization);
 
       /* Main loop */
       while(!done && !buzz_script_done() && ros::ok()){
