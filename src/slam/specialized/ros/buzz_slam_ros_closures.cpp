@@ -14,9 +14,6 @@ static int BuzzAddSeparatorOutlier(buzzvm_t vm) {
    int is_added = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMRos>(vm->robot)->AddSeparatorMeasurementOutlier();
    buzzvm_pushi(vm, is_added);
 
-   // Log transmitted information
-   number_of_bytes_exchanged_ += sizeof is_added;
-
    return buzzvm_ret1(vm);
 }
 
@@ -71,9 +68,6 @@ static int BuzzStartOptimizationTriggered(buzzvm_t vm) {
    /* Call function */
    bool start_triggered = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMRos>(vm->robot)->GetStartOptimizationTriggered();
    buzzvm_pushi(vm, start_triggered);
-
-   // Log transmitted information
-   number_of_bytes_exchanged_ += sizeof start_triggered;
 
    return buzzvm_ret1(vm);
 }

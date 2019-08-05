@@ -127,6 +127,13 @@ int BuzzSLAM::GetNumberOfPoses() {
 /****************************************/
 /****************************************/
 
+void BuzzSLAM::AddNbByteTransmitted(const int nb_bytes) {
+   number_of_bytes_exchanged_ += nb_bytes;
+}
+
+/****************************************/
+/****************************************/
+
 void BuzzSLAM::UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
                                              const int& robot_2_id,
                                              const int& robot_1_pose_id,

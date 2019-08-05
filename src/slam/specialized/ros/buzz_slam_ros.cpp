@@ -256,7 +256,7 @@ int BuzzSLAMRos::AddSeparatorMeasurementOutlier() {
 /****************************************/
 
 void BuzzSLAMRos::WriteOptimizedDataset() {
-   double duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
+   double duration = ( std::clock() - start_time_ ) / (double) CLOCKS_PER_SEC;
    std::string time_file_name = log_folder_  + std::to_string(robot_id_) + "_time.g2o";
    std::ofstream time_file;
    time_file.open(time_file_name, std::ios::trunc);

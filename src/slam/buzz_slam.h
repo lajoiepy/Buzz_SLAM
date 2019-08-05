@@ -139,6 +139,8 @@ public:
 
    virtual buzzvm_state RegisterSLAMFunctions(buzzvm_t buzz_vm);
 
+   void AddNbByteTransmitted(const int nb_bytes);
+
 protected:
    // Functions for link with buzz VM
    void UpdateCurrentSeparatorBuzzStructure( const int& robot_1_id,
