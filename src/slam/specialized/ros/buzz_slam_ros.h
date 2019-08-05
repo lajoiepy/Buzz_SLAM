@@ -3,6 +3,7 @@
 
 #include "../../buzz_slam.h"
 #include <map>
+#include <ctime>
 
 namespace buzz_slam {
 
@@ -80,6 +81,7 @@ private:
    
    // Control variable
    bool start_optimization_triggered_;
+   std::clock_t start_time_;
 
 };
 }

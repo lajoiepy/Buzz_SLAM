@@ -43,13 +43,16 @@ void BuzzSLAM::Init(buzzvm_t buzz_vm) {
    has_sent_start_optimization_flag_ = false;
    is_prior_added_ = false;
    number_of_optimization_run_ = 0;
+   number_of_bytes_exchanged_ = 0;
    lowest_id_included_in_global_map_ = robot_id_;
    lowest_id_to_include_in_global_map_ = lowest_id_included_in_global_map_;
    buzzobj_t b_lowest_id_included_in_global_map = buzzheap_newobj(buzz_vm_, BUZZTYPE_INT);
    b_lowest_id_included_in_global_map->i.value = lowest_id_included_in_global_map_;
    Register(buzz_vm_, "lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
+   number_of_bytes_exchanged_ += sizeof b_lowest_id_included_in_global_map->i.value;
    anchor_offset_ = gtsam::Point3();
    adjacency_matrix_ = gtsam::zeros(number_of_robots_, number_of_robots_);
+   number_of_optimization_steps_ = 0;
 
    // Delete existent log files
    std::string log_file_name = log_folder_ + "centralized.g2o";
@@ -165,6 +168,11 @@ void BuzzSLAM::UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
    // Register positioning data table as global symbol
    Register(buzz_vm_, "current_separator_measurement", b_separator_measurement);
 
+   // Log transmitted information
+   number_of_bytes_exchanged_ += (sizeof robot_1_id) + (sizeof robot_2_id) +
+                                 (sizeof robot_1_pose_id) + (sizeof robot_2_pose_id) +
+                                 (sizeof x) + (sizeof y) + (sizeof z) + (sizeof q_x) +
+                                 (sizeof q_y) + (sizeof q_z) + (sizeof q_w) + 36 * sizeof(double);
 }
 
 /****************************************/
@@ -265,6 +273,7 @@ void BuzzSLAM::OptimizerTick() {
                optimizer_->removePrior();
                is_prior_added_ = false;
             }
+            number_of_optimization_steps_ = 0;
          }
          break;
       case Start :
@@ -272,10 +281,12 @@ void BuzzSLAM::OptimizerTick() {
             std::cout << "Robot " << robot_id_ << " Start Distributed Pose Graph Optimization" << std::endl;
          }
          optimizer_state_ = OptimizerState::Initialization;
+         number_of_optimization_steps_ ++;
          break;
       case Initialization :
          optimizer_state_ = OptimizerState::RotationEstimation;
          InitializePoseGraphOptimization();
+         number_of_optimization_steps_ ++;
          break;
       case RotationEstimation :
          if (RotationEstimationStoppingBarrier()) {
@@ -288,12 +299,14 @@ void BuzzSLAM::OptimizerTick() {
          if (current_rotation_iteration_ > number_of_steps_before_failsafe_) {
             RemoveInactiveNeighbors();
          }
-         FailSafeCheck();         
+         FailSafeCheck(); 
+         number_of_optimization_steps_ ++;        
          break;
       case PoseEstimationInitialization :
          InitializePoseEstimation();
          // Change optimizer state
          optimizer_state_ = OptimizerState::PoseEstimation;
+         number_of_optimization_steps_ ++;
          break;
       case PoseEstimation :
          if (PoseEstimationStoppingBarrier()) {
@@ -304,6 +317,7 @@ void BuzzSLAM::OptimizerTick() {
             SetPoseEstimationIsFinishedFlagsToFalse();
          }
          FailSafeCheck();
+         number_of_optimization_steps_ ++;
          break;
       case End :
          EndOptimization();
@@ -316,9 +330,11 @@ void BuzzSLAM::OptimizerTick() {
          }
          optimizer_state_ = OptimizerState::PostEndingCommunicationDelay;
          number_of_poses_at_optimization_end_ = number_of_poses_;
+         number_of_optimization_steps_ ++;
          break;
       case PostEndingCommunicationDelay :
          optimizer_state_ = OptimizerState::Idle;
+         number_of_optimization_steps_ ++;
          break;
    }
 }
@@ -781,6 +797,9 @@ void BuzzSLAM::UpdateCurrentPoseEstimate(const int& pose_id) {
    }
    // Register pose estimate data table as a global symbol
    Register(buzz_vm_, "current_pose_estimate", b_pose_estimate);
+
+   // Log transmitted information
+   number_of_bytes_exchanged_ += 16 * sizeof(double) + 36 * sizeof(double);
 }
 
 /****************************************/
@@ -861,6 +880,11 @@ void BuzzSLAM::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
 
          TablePut(buzz_vm_, b_rotation_estimates, table_size, b_individual_estimate);
          table_size++;
+
+         // Log transmitted information
+         number_of_bytes_exchanged_ += (sizeof robot_id_) + (sizeof robot_pose_id) +
+                                       (sizeof other_robot_id) + (sizeof optimizer_is_initialized) +
+                                       (sizeof is_estimation_done_) + 9 * sizeof(double);
       }
 
    }
@@ -1037,6 +1061,11 @@ void BuzzSLAM::ComputeAndUpdatePoseEstimatesToSend(const int& rid) {
          table_size++;
 
          gtsam::Symbol debug_symbol(robot_id_char_, robot_pose_id);
+
+         // Log transmitted information
+         number_of_bytes_exchanged_ += (sizeof robot_id_) + (sizeof robot_pose_id) +
+                                       (sizeof other_robot_id) + (sizeof optimizer_is_initialized) +
+                                       (sizeof is_estimation_done_) + 6 * sizeof(double);
       }
 
    }
@@ -1143,7 +1172,11 @@ bool BuzzSLAM::PoseEstimationStoppingConditions() {
          TablePut(buzz_vm_, b_offset, i, anchor_offset_.vector()[i]);
       }
       Register(buzz_vm_, "anchor_offset", b_offset);
+
+      // Log transmitted information
+      number_of_bytes_exchanged_ += 3 * sizeof(double);
    }
+
    return pose_estimation_phase_is_finished_;
 }
 
@@ -1206,6 +1239,9 @@ void BuzzSLAM::EndOptimization() {
    b_lowest_id_included_in_global_map->i.value = lowest_id_included_in_global_map_;
    Register(buzz_vm_, "lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
 
+   // Log transmitted information
+   number_of_bytes_exchanged_ += (sizeof lowest_id_included_in_global_map_);
+
    WriteOptimizedDataset();
 }
 
@@ -1259,6 +1295,7 @@ void BuzzSLAM::UpdateAdjacencyVector() {
       }
    }
    Register(buzz_vm_, "adjacency_vector", b_adjacency_vector);
+   number_of_bytes_exchanged_ += number_of_robots_ * sizeof(int);
 }
 
 /****************************************/

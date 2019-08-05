@@ -151,6 +151,7 @@ bool BuzzSLAMRos::GetStartOptimizationTriggered() {
 
 void BuzzSLAMRos::TriggerOptimization() {
    start_optimization_triggered_ = true;
+   start_time_ = std::clock();
 }
 
 /****************************************/
@@ -255,6 +256,13 @@ int BuzzSLAMRos::AddSeparatorMeasurementOutlier() {
 /****************************************/
 
 void BuzzSLAMRos::WriteOptimizedDataset() {
+   double duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
+   std::string time_file_name = log_folder_  + std::to_string(robot_id_) + "_time.g2o";
+   std::ofstream time_file;
+   time_file.open(time_file_name, std::ios::trunc);
+   time_file << duration << "\n" ;
+   time_file.close();
+
    BuzzSLAM::WriteOptimizedDataset();
 
    std::string inliers_added_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_inliers_added.g2o";
@@ -286,6 +294,18 @@ void BuzzSLAMRos::WriteOptimizedDataset() {
    reference_frame_file.close();
 
    start_optimization_triggered_ = false;
+
+   std::string data_transmitted_file_name = log_folder_  + std::to_string(robot_id_) + "_bytes_transmitted.g2o";
+   std::ofstream data_transmitted_file;
+   data_transmitted_file.open(data_transmitted_file_name, std::ios::trunc);
+   data_transmitted_file << number_of_bytes_exchanged_ << "\n" ;
+   data_transmitted_file.close();
+
+   std::string number_of_steps_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_steps.g2o";
+   std::ofstream number_of_steps_file;
+   number_of_steps_file.open(number_of_steps_file_name, std::ios::trunc);
+   number_of_steps_file << number_of_optimization_steps_ << "\n" ;
+   number_of_steps_file.close();
 }
 
 /****************************************/

@@ -344,6 +344,10 @@ protected:
 
    std::string log_folder_;
 
+   uint64_t number_of_bytes_exchanged_;
+
+   int number_of_optimization_steps_;
+
 };
 }
 

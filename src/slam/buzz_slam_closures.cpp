@@ -26,6 +26,9 @@ static int BuzzOptimizerState(buzzvm_t vm){
    int state = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->GetOptimizerState();
    buzzvm_pushi(vm, state);
 
+   // Log transmitted information
+   number_of_bytes_exchanged_ += sizeof state;
+
    return buzzvm_ret1(vm);
 }
 
@@ -48,6 +51,9 @@ static int BuzzOptimizerPhase(buzzvm_t vm){
    buzzvm_gload(vm);
    int phase = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->GetOptimizerPhase();
    buzzvm_pushi(vm, phase);
+
+   // Log transmitted information
+   number_of_bytes_exchanged_ += sizeof phase;
 
    return buzzvm_ret1(vm);
 }
@@ -510,6 +516,9 @@ static int BuzzRandUniform(buzzvm_t vm){
 
    buzzvm_pushf(vm, random_value);
 
+   // Log transmitted information
+   number_of_bytes_exchanged_ += sizeof random_value;
+
    return buzzvm_ret1(vm);
 }
 
@@ -731,6 +740,9 @@ static int BuzzRotationEstimationStoppingConditions(buzzvm_t vm){
    bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->RotationEstimationStoppingConditions();
    buzzvm_pushi(vm, is_finished);
 
+   // Log transmitted information
+   number_of_bytes_exchanged_ += sizeof is_finished;
+
    return buzzvm_ret1(vm);
 }
 
@@ -743,6 +755,9 @@ static int BuzzPoseEstimationStoppingConditions(buzzvm_t vm){
    buzzvm_gload(vm);
    bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->PoseEstimationStoppingConditions();
    buzzvm_pushi(vm, is_finished);
+
+   // Log transmitted information
+   number_of_bytes_exchanged_ += sizeof is_finished;
 
    return buzzvm_ret1(vm);
 }
