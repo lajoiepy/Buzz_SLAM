@@ -264,6 +264,7 @@ void BuzzSLAM::OptimizerTick() {
                optimizer_->removePrior();
                is_prior_added_ = false;
             }
+            number_of_bytes_exchanged_during_optimization_ = 0;
          }
          break;
       case Start :
@@ -857,6 +858,11 @@ void BuzzSLAM::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
 
          TablePut(buzz_vm_, b_rotation_estimates, table_size, b_individual_estimate);
          table_size++;
+
+         int data_size = (sizeof robot_id_) + (sizeof robot_pose_id) +
+                                       (sizeof other_robot_id) + (sizeof optimizer_is_initialized) +
+                                       (sizeof is_estimation_done_) + 9 * sizeof(double);
+         number_of_bytes_exchanged_during_optimization_ += data_size;
       }
 
    }
@@ -1030,6 +1036,11 @@ void BuzzSLAM::ComputeAndUpdatePoseEstimatesToSend(const int& rid) {
          table_size++;
 
          gtsam::Symbol debug_symbol(robot_id_char_, robot_pose_id);
+         
+         int data_size = (sizeof robot_id_) + (sizeof robot_pose_id) +
+                                       (sizeof other_robot_id) + (sizeof optimizer_is_initialized) +
+                                       (sizeof is_estimation_done_) + 6 * sizeof(double);
+         number_of_bytes_exchanged_during_optimization_ += data_size;
       }
 
    }

@@ -52,7 +52,7 @@ void BuzzSLAMDataset::Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gt
          "\tRotationNoiseStd\tTranslationNoiseStd\tRotationChangeThreshold\tPoseChangeThreshold"
          "\tOptimizerPeriod\tChiSquaredProbability"
          "\tErrorCentralized\tErrorDecentralized\tErrorInitial\tNumberOfRotationIterations\tNumberOfPoseIterations"
-         "\tNumberOfInliers\tNumberOfOutliers\tNumberOfSeparatorsRejected\tNumberOfOutliersNotRejected\n";
+         "\tNumberOfInliers\tNumberOfOutliers\tNumberOfSeparatorsRejected\tNumberOfOutliersNotRejected\tByteTransmitted\n";
       error_file.close();
    }
    std::string log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_inliers_added_keys.g2o";
@@ -101,11 +101,11 @@ void BuzzSLAMDataset::Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gt
             dataset_graph_and_values.second->insert(second_key, current_pose);
          }
       } else {
-         if (first_symbol.chr() == robot_id_char_ && first_symbol.index() > second_symbol.index()) {
+         if (first_symbol.chr() == robot_id_char_ && first_symbol.index() >= second_symbol.index()) {
             if (loop_closure_linked_to_key_.count(first_key) == 0) {
                loop_closure_linked_to_key_.insert(std::make_pair(first_key, std::make_pair(first_key, second_key)));
             }
-         } else if (second_symbol.chr() == robot_id_char_ && second_symbol.index() > first_symbol.index()) {
+         } else if (second_symbol.chr() == robot_id_char_ && second_symbol.index() >= first_symbol.index()) {
             if (loop_closure_linked_to_key_.count(second_key) == 0) {
                loop_closure_linked_to_key_.insert(std::make_pair(second_key, std::make_pair(first_key, second_key)));
             }
@@ -557,6 +557,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
                << "\t" << inliers_outliers_added.second 
                << "\t" << total_number_of_separators_rejected_on_all_robots 
                << "\t" << number_of_outliers_not_rejected
+               << "\t" << number_of_bytes_exchanged_during_optimization_
                << "\n";
       error_file.close();
 
@@ -799,6 +800,7 @@ void BuzzSLAMDataset::AbortOptimization(const bool& log_info){
                << "\t" << inliers_outliers_added.second 
                << "\t" << std::round(total_number_of_separators_rejected_on_all_robots) 
                << "\t" << number_of_outliers_not_rejected
+               << "\t" << number_of_bytes_exchanged_during_optimization_
                << "\n";
       error_file.close();
    }

@@ -342,6 +342,8 @@ protected:
 
    std::string error_file_name_;
 
+   int number_of_bytes_exchanged_during_optimization_;
+
 };
 }
 
