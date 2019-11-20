@@ -1,4 +1,4 @@
-#include "buzz_slam_dataset.h"
+#include "buzz_slam_ros.h"
 #include "../../buzz_slam_singleton.h"
 
 namespace buzz_slam {
@@ -6,26 +6,12 @@ namespace buzz_slam {
 /************ Buzz Closures *************/
 /****************************************/
 
-static int BuzzAddSeparator(buzzvm_t vm) {
-   /* Get pointer to the controller */
-   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
-   buzzvm_gload(vm);
-   /* Call function */
-   int is_added = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMDataset>(vm->robot)->AddSeparatorMeasurement();
-   buzzvm_pushi(vm, is_added);
-
-   return buzzvm_ret1(vm);
-}
-
-/****************************************/
-/****************************************/
-
 static int BuzzAddSeparatorOutlier(buzzvm_t vm) {
    /* Get pointer to the controller */
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   int is_added = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMDataset>(vm->robot)->AddSeparatorMeasurementOutlier();
+   int is_added = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMRos>(vm->robot)->AddSeparatorMeasurementOutlier();
    buzzvm_pushi(vm, is_added);
 
    return buzzvm_ret1(vm);
@@ -34,28 +20,15 @@ static int BuzzAddSeparatorOutlier(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-static int BuzzLoadDatasetParameters(buzzvm_t vm) {
+static int BuzzLoadRosParameters(buzzvm_t vm) {
    /* Push the vector components */
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
-   buzzvm_lload(vm, 3);
    /* Create a new vector with that */
    float sensor_range;
    int outlier_period;
-   std::string dataset_name;
-   buzzobj_t b_dataset_name = buzzvm_stack_at(vm, 3);
    buzzobj_t b_sensor_range = buzzvm_stack_at(vm, 2);
    buzzobj_t b_outlier_period = buzzvm_stack_at(vm, 1);
-   if(b_dataset_name->o.type == BUZZTYPE_STRING) dataset_name = b_dataset_name->s.value.str;
-   else {
-      buzzvm_seterror(vm,
-                      BUZZVM_ERROR_TYPE,
-                      "load_no_sensing_parameters: expected %s, got %s in second argument",
-                      buzztype_desc[BUZZTYPE_STRING],
-                      buzztype_desc[b_dataset_name->o.type]
-         );
-      return vm->state;
-   } 
    if(b_sensor_range->o.type == BUZZTYPE_FLOAT) sensor_range = b_sensor_range->f.value;
    else {
       buzzvm_seterror(vm,
@@ -80,7 +53,7 @@ static int BuzzLoadDatasetParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(vm->robot)->LoadParameters(dataset_name, sensor_range, outlier_period);
+   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(vm->robot)->LoadParameters(sensor_range, outlier_period);
    
    return buzzvm_ret0(vm);
 } 
@@ -88,33 +61,33 @@ static int BuzzLoadDatasetParameters(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-static int BuzzReadNextEntry(buzzvm_t vm) {
-   buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(vm->robot)->AddOdometryMeasurement();
-   int number_of_poses = buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMDataset>(vm->robot)->GetNumberOfPoses();
-   
-   buzzvm_pushi(vm, number_of_poses);
+static int BuzzStartOptimizationTriggered(buzzvm_t vm) {
+   /* Get pointer to the controller */
+   buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
+   buzzvm_gload(vm);
+   /* Call function */
+   bool start_triggered = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAMRos>(vm->robot)->GetStartOptimizationTriggered();
+   buzzvm_pushi(vm, start_triggered);
+
    return buzzvm_ret1(vm);
-} 
+}
 
 /****************************************/
 /************ Registration **************/
 /****************************************/
 
-buzzvm_state BuzzSLAMDataset::RegisterSLAMFunctions(buzzvm_t buzz_vm) {
+buzzvm_state BuzzSLAMRos::RegisterSLAMFunctions(buzzvm_t buzz_vm) {
 
    BuzzSLAM::RegisterSLAMFunctions(buzz_vm);
    /* Register mapping without sensing specific functions */
-   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "add_separator", 1));
-   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzAddSeparator));
-   buzzvm_gstore(buzz_vm);
    buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "add_separator_outlier", 1));
    buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzAddSeparatorOutlier));
    buzzvm_gstore(buzz_vm);
-   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "load_dataset_parameters", 1));
-   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzLoadDatasetParameters));
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "load_ros_parameters", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzLoadRosParameters));
    buzzvm_gstore(buzz_vm);
-   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "read_next_entry", 1));
-   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzReadNextEntry));
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "start_optimization_triggered", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzStartOptimizationTriggered));
    buzzvm_gstore(buzz_vm);
 
    return buzz_vm->state;

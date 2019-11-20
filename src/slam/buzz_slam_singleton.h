@@ -3,6 +3,7 @@
 
 #include "specialized/no_sensing/buzz_slam_no_sensing.h"
 #include "specialized/dataset/buzz_slam_dataset.h"
+#include "specialized/ros/buzz_slam_ros.h"
 #include <memory>
 #include <utility>
 #include <map>

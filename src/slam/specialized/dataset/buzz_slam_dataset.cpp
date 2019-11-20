@@ -55,11 +55,11 @@ void BuzzSLAMDataset::Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gt
          "\tNumberOfInliers\tNumberOfOutliers\tNumberOfSeparatorsRejected\tNumberOfOutliersNotRejected\n";
       error_file.close();
    }
-   std::string log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_inliers_added_keys.g2o";
+   std::string log_file_name = log_folder_  + std::to_string(robot_id_) + "_inliers_added_keys.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_outliers_added_keys.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_outliers_added_keys.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_reference_frame.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_reference_frame.g2o";
    std::remove(log_file_name.c_str());
 
    // Read .g2o dataset file
@@ -338,13 +338,13 @@ int BuzzSLAMDataset::AddSeparatorMeasurementOutlier() {
 void BuzzSLAMDataset::WriteOptimizedDataset() {
    BuzzSLAM::WriteOptimizedDataset();
 
-   std::string inliers_added_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_inliers_added.g2o";
+   std::string inliers_added_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_inliers_added.g2o";
    std::ofstream inliers_added_file;
    inliers_added_file.open(inliers_added_file_name, std::ios::trunc);
    inliers_added_file << number_of_inliers_added_ << "\n" ;
    inliers_added_file.close();
 
-   std::string outliers_keys_file_name = "log/datasets/" + std::to_string(robot_id_) + "_outliers_added_keys.g2o";
+   std::string outliers_keys_file_name = log_folder_  + std::to_string(robot_id_) + "_outliers_added_keys.g2o";
    std::ofstream outliers_keys_file;
    outliers_keys_file.open(outliers_keys_file_name, std::ios::trunc);
    for (const auto& keys : outliers_keys_) {
@@ -352,7 +352,7 @@ void BuzzSLAMDataset::WriteOptimizedDataset() {
    }
    outliers_keys_file.close();
 
-   std::string inliers_keys_file_name = "log/datasets/" + std::to_string(robot_id_) + "_inliers_added_keys.g2o";
+   std::string inliers_keys_file_name = log_folder_  + std::to_string(robot_id_) + "_inliers_added_keys.g2o";
    std::ofstream inliers_keys_file;
    inliers_keys_file.open(inliers_keys_file_name, std::ios::trunc);
    for (const auto& keys : inliers_keys_) {
@@ -360,7 +360,7 @@ void BuzzSLAMDataset::WriteOptimizedDataset() {
    }
    inliers_keys_file.close();
 
-   std::string reference_frame_file_name = "log/datasets/" + std::to_string(robot_id_) + "_reference_frame.g2o";
+   std::string reference_frame_file_name = log_folder_  + std::to_string(robot_id_) + "_reference_frame.g2o";
    std::ofstream reference_frame_file;
    reference_frame_file.open(reference_frame_file_name, std::ios::trunc);
    reference_frame_file << lowest_id_included_in_global_map_ << "\n" ;
@@ -386,7 +386,7 @@ void BuzzSLAMDataset::RemoveRejectedKeys() {
 std::set<std::pair<gtsam::Key, gtsam::Key>> BuzzSLAMDataset::AggregateOutliersKeys(const std::set<int>& robots) {
    std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys;
    for (const auto& i : robots) {
-      std::string outliers_keys_file_name = "log/datasets/" + std::to_string(i) + "_outliers_added_keys.g2o";
+      std::string outliers_keys_file_name = log_folder_  + std::to_string(i) + "_outliers_added_keys.g2o";
       std::ifstream outliers_keys_file(outliers_keys_file_name);
       long unsigned int key1, key2;
       while (outliers_keys_file >> key1)
@@ -405,7 +405,7 @@ std::set<std::pair<gtsam::Key, gtsam::Key>> BuzzSLAMDataset::AggregateOutliersKe
 std::pair<int, int> BuzzSLAMDataset::CountInliersAndOutliers(const std::set<int>& robots) {
    std::set<std::pair<gtsam::Key, gtsam::Key>> inliers_keys;
    for (const auto& i : robots) {
-      std::string inliers_keys_file_name = "log/datasets/" + std::to_string(i) + "_inliers_added_keys.g2o";
+      std::string inliers_keys_file_name = log_folder_  + std::to_string(i) + "_inliers_added_keys.g2o";
       std::ifstream inliers_keys_file(inliers_keys_file_name);
       long unsigned int key1, key2;
       while (inliers_keys_file >> key1)
@@ -422,7 +422,7 @@ std::pair<int, int> BuzzSLAMDataset::CountInliersAndOutliers(const std::set<int>
    }
    std::set<std::pair<gtsam::Key, gtsam::Key>> outliers_keys;
    for (const auto& i : robots) {
-      std::string outliers_keys_file_name = "log/datasets/" + std::to_string(i) + "_outliers_added_keys.g2o";
+      std::string outliers_keys_file_name = log_folder_  + std::to_string(i) + "_outliers_added_keys.g2o";
       std::ifstream outliers_keys_file(outliers_keys_file_name);
       long unsigned int key1, key2;
       while (outliers_keys_file >> key1)
@@ -453,7 +453,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
    ComputeCentralizedEstimateIncremental(robots, "_no_filtering");
 
    // Collect expected estimate size
-   std::string local_dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
+   std::string local_dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial.g2o";
    gtsam::GraphAndValues local_graph_and_values = gtsam::readG2o(local_dataset_file_name, true);
    int expected_size = local_graph_and_values.second->size();
 
@@ -464,7 +464,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
    int number_of_separators = 0;
    int number_of_outliers_not_rejected = 0;
    for (const auto& i : robots) {
-      std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_optimized.g2o";
+      std::string dataset_file_name = log_folder_  + std::to_string(i) + "_optimized.g2o";
       if (!boost::filesystem::exists(dataset_file_name)) {
          if (debug_level_ >= 3) {
             std::cout << "Robot " << robot_id_ << " Evaluation : Other files do not exist yet" << std::endl;
@@ -504,7 +504,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
          }
          current_index++;
       }
-      dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial.g2o";
+      dataset_file_name = log_folder_  + std::to_string(i) + "_initial.g2o";
       graph_and_values = gtsam::readG2o(dataset_file_name, true);
       // Remove factor involving values from robots not in communication range
       int number_of_factors_removed = 0;
@@ -531,7 +531,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
       // Gather info on outliers rejection
       double total_number_of_separators_rejected_on_all_robots = 0;
       for (const auto& i : robots) {
-         std::string separators_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_separators_rejected.g2o";
+         std::string separators_rejected_file_name = log_folder_  + std::to_string(i) + "_number_of_separators_rejected.g2o";
          std::ifstream separators_rejected_file(separators_rejected_file_name);
          int number_of_separators_rejected  = 0;
          separators_rejected_file >> number_of_separators_rejected;
@@ -585,7 +585,7 @@ void BuzzSLAMDataset::ComputeCentralizedEstimate(const std::string& centralized_
    // Aggregate estimates from all the robots
    std::vector<gtsam::GraphAndValues> graph_and_values_vec;
    for (const auto& i : robots) {
-      std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial_centralized" + centralized_extension + ".g2o";
+      std::string dataset_file_name = log_folder_  + std::to_string(i) + "_initial_centralized" + centralized_extension + ".g2o";
       if (boost::filesystem::exists(dataset_file_name)) {
          gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
          graph_and_values_vec.push_back(graph_and_values);
@@ -622,9 +622,9 @@ void BuzzSLAMDataset::ComputeCentralizedEstimate(const std::string& centralized_
    }
 
    for (const auto& i : robots) {
-      std::string centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized" + centralized_extension + ".g2o";
+      std::string centralized_file_name = log_folder_  + std::to_string(i) + "_centralized" + centralized_extension + ".g2o";
       gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_values_by_robots[i], centralized_file_name);
-      centralized_file_name = "log/datasets/" + std::to_string(i) + "_centralized_GN" + centralized_extension + ".g2o";
+      centralized_file_name = log_folder_  + std::to_string(i) + "_centralized_GN" + centralized_extension + ".g2o";
       gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_GN_values_by_robots[i], centralized_file_name);
    }
 
@@ -637,14 +637,14 @@ void BuzzSLAMDataset::ComputeCentralizedEstimateIncremental(std::set<int> robots
 
    // Aggregate estimates from all the robots
    std::vector<gtsam::GraphAndValues> graph_and_values_vec;
-   std::string dataset_file_name = "log/datasets/" + std::to_string(prior_owner_) + "_initial_centralized" + centralized_extension + "_incremental.g2o";
+   std::string dataset_file_name = log_folder_  + std::to_string(prior_owner_) + "_initial_centralized" + centralized_extension + "_incremental.g2o";
    if (boost::filesystem::exists(dataset_file_name)) {
       gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
       graph_and_values_vec.push_back(graph_and_values);
    }
    for (const auto& i : robots) {
       if (i != prior_owner_){
-         dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial_centralized" + centralized_extension + "_incremental.g2o";
+         dataset_file_name = log_folder_  + std::to_string(i) + "_initial_centralized" + centralized_extension + "_incremental.g2o";
          if (boost::filesystem::exists(dataset_file_name)) {
             gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
             graph_and_values_vec.push_back(graph_and_values);
@@ -669,7 +669,7 @@ void BuzzSLAMDataset::ComputeCentralizedEstimateIncremental(std::set<int> robots
    // Get anchor offset
    gtsam::Point3 anchor_offset_translation = gtsam::Point3();
    gtsam::Rot3 anchor_offset_rotation = gtsam::Rot3();
-   dataset_file_name = "log/datasets/" + std::to_string(prior_owner_) + "_centralized" + centralized_extension + "_incremental.g2o";
+   dataset_file_name = log_folder_  + std::to_string(prior_owner_) + "_centralized" + centralized_extension + "_incremental.g2o";
    if (boost::filesystem::exists(dataset_file_name)) {
       gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
       gtsam::Key first_key = gtsam::KeyVector(graph_and_values.second->keys()).at(0);
@@ -702,7 +702,7 @@ void BuzzSLAMDataset::ComputeCentralizedEstimateIncremental(std::set<int> robots
    }
 
    anchor_offset_translation = gtsam::Point3();
-   dataset_file_name = "log/datasets/" + std::to_string(prior_owner_) + "_centralized_GN" + centralized_extension + "_incremental.g2o";
+   dataset_file_name = log_folder_  + std::to_string(prior_owner_) + "_centralized_GN" + centralized_extension + "_incremental.g2o";
    if (boost::filesystem::exists(dataset_file_name)) {
       gtsam::GraphAndValues graph_and_values = gtsam::readG2o(dataset_file_name, true);
       gtsam::Key first_key = gtsam::KeyVector(graph_and_values.second->keys()).at(0);
@@ -726,9 +726,9 @@ void BuzzSLAMDataset::ComputeCentralizedEstimateIncremental(std::set<int> robots
       }
    }
 
-   std::string centralized_file_name = "log/datasets/" + std::to_string(robot_id_) + "_centralized" + centralized_extension + "_incremental.g2o";
+   std::string centralized_file_name = log_folder_  + std::to_string(robot_id_) + "_centralized" + centralized_extension + "_incremental.g2o";
    gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_values_by_robots[robot_id_], centralized_file_name);
-   centralized_file_name = "log/datasets/" + std::to_string(robot_id_) + "_centralized_GN" + centralized_extension + "_incremental.g2o";
+   centralized_file_name = log_folder_  + std::to_string(robot_id_) + "_centralized_GN" + centralized_extension + "_incremental.g2o";
    gtsam::writeG2o(gtsam::NonlinearFactorGraph(), centralized_GN_values_by_robots[robot_id_], centralized_file_name);
    IncrementalInitialGuessUpdate(centralized_values_by_robots[robot_id_], poses_initial_guess_centralized_incremental_updates_);
 
@@ -748,7 +748,7 @@ void BuzzSLAMDataset::AbortOptimization(const bool& log_info){
       int number_of_separators = 0;
       int number_of_outliers_not_rejected = 0;
       for (const auto& i : robots) {
-         std::string dataset_file_name = "log/datasets/" + std::to_string(i) + "_initial.g2o";
+         std::string dataset_file_name = log_folder_  + std::to_string(i) + "_initial.g2o";
          if (!boost::filesystem::exists(dataset_file_name)) {
             return; // File does not exists yet
          }
@@ -773,7 +773,7 @@ void BuzzSLAMDataset::AbortOptimization(const bool& log_info){
       // Gather info on outliers rejection
       double total_number_of_separators_rejected_on_all_robots = 0;
       for (const auto& i : robots) {
-         std::string separators_rejected_file_name = "log/datasets/" + std::to_string(i) + "_number_of_separators_rejected.g2o";
+         std::string separators_rejected_file_name = log_folder_  + std::to_string(i) + "_number_of_separators_rejected.g2o";
          std::ifstream separators_rejected_file(separators_rejected_file_name);
          int number_of_separators_rejected  = 0;
          separators_rejected_file >> number_of_separators_rejected;

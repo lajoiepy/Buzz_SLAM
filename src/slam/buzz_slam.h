@@ -65,7 +65,7 @@ public:
 
    void Init(buzzvm_t buzz_vm);
 
-   void LoadParameters( const int& period, const int& number_of_steps_before_failsafe, const bool& use_pcm,
+   void LoadParameters( const std::string& log_folder, const int& period, const int& number_of_steps_before_failsafe, const bool& use_pcm,
                         const double& confidence_probability, const bool& incremental_solving, const int& debug,
                         const float& rotation_noise_std, const float& translation_noise_std,
                         const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
@@ -138,6 +138,8 @@ public:
    int GetNumberOfPoses();
 
    virtual buzzvm_state RegisterSLAMFunctions(buzzvm_t buzz_vm);
+
+   void AddNbByteTransmitted(const int nb_bytes);
 
 protected:
    // Functions for link with buzz VM
@@ -341,6 +343,12 @@ protected:
    bool is_simulation_;
 
    std::string error_file_name_;
+
+   std::string log_folder_;
+
+   uint64_t number_of_bytes_exchanged_;
+
+   int number_of_optimization_steps_;
 
 };
 }
