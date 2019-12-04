@@ -43,29 +43,33 @@ void BuzzSLAM::Init(buzzvm_t buzz_vm) {
    has_sent_start_optimization_flag_ = false;
    is_prior_added_ = false;
    number_of_optimization_run_ = 0;
+   number_of_bytes_exchanged_ = 0;
    lowest_id_included_in_global_map_ = robot_id_;
    lowest_id_to_include_in_global_map_ = lowest_id_included_in_global_map_;
    buzzobj_t b_lowest_id_included_in_global_map = buzzheap_newobj(buzz_vm_, BUZZTYPE_INT);
    b_lowest_id_included_in_global_map->i.value = lowest_id_included_in_global_map_;
    Register(buzz_vm_, "lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
+   number_of_bytes_exchanged_ += sizeof b_lowest_id_included_in_global_map->i.value;
    anchor_offset_ = gtsam::Point3();
    adjacency_matrix_ = gtsam::zeros(number_of_robots_, number_of_robots_);
+   number_of_optimization_steps_ = 0;
 
    // Delete existent log files
-   std::remove("log/datasets/centralized.g2o");
-   std::string log_file_name = "log/datasets/" + std::to_string(robot_id_) + ".g2o";
+   std::string log_file_name = log_folder_ + "centralized.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + ".g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_initial.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_optimized.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
+   std::remove(log_file_name.c_str());
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
    std::remove(log_file_name.c_str());
 
    InitOptimizer();
@@ -78,7 +82,7 @@ void BuzzSLAM::Init(buzzvm_t buzz_vm) {
 /****************************************/
 /****************************************/
 
-void BuzzSLAM::LoadParameters( const int& period, const int& number_of_steps_before_failsafe, const bool& use_pcm,
+void BuzzSLAM::LoadParameters( const std::string& log_folder, const int& period, const int& number_of_steps_before_failsafe, const bool& use_pcm,
                                                 const double& pcm_threshold, const bool& incremental_solving, const int& debug,
                                                 const float& rotation_noise_std, const float& translation_noise_std,
                                                 const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
@@ -105,6 +109,7 @@ void BuzzSLAM::LoadParameters( const int& period, const int& number_of_steps_bef
 
    optimizer_period_ = period;
    use_heuristics_ = use_heuristics;
+   log_folder_ = log_folder;
 }
 
 /****************************************/
@@ -119,6 +124,13 @@ OptimizerState BuzzSLAM::GetOptimizerState() {
 
 int BuzzSLAM::GetNumberOfPoses() {
     return number_of_poses_;
+}
+
+/****************************************/
+/****************************************/
+
+void BuzzSLAM::AddNbByteTransmitted(const int nb_bytes) {
+   number_of_bytes_exchanged_ += nb_bytes;
 }
 
 /****************************************/
@@ -165,6 +177,11 @@ void BuzzSLAM::UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
    // Register positioning data table as global symbol
    Register(buzz_vm_, "current_separator_measurement", b_separator_measurement);
 
+   // Log transmitted information
+   number_of_bytes_exchanged_ += (sizeof robot_1_id) + (sizeof robot_2_id) +
+                                 (sizeof robot_1_pose_id) + (sizeof robot_2_pose_id) +
+                                 (sizeof x) + (sizeof y) + (sizeof z) + (sizeof q_x) +
+                                 (sizeof q_y) + (sizeof q_z) + (sizeof q_w) + 36 * sizeof(double);
 }
 
 /****************************************/
@@ -228,7 +245,6 @@ void BuzzSLAM::SaveBackup() {
 /****************************************/
 
 void BuzzSLAM::AbortOptimization(const bool& log_info) {
-
    for (const auto& transform : robot_local_map_backup_.getTransforms().transforms) {
       if (robot_local_map_.getTransforms().transforms.find(transform.first) == robot_local_map_.getTransforms().transforms.end()) {
          gtsam::SharedNoiseModel model = gtsam::noiseModel::Gaussian::Covariance(transform.second.pose.covariance_matrix);
@@ -266,6 +282,7 @@ void BuzzSLAM::OptimizerTick() {
                optimizer_->removePrior();
                is_prior_added_ = false;
             }
+            number_of_optimization_steps_ = 0;
          }
          break;
       case Start :
@@ -273,10 +290,12 @@ void BuzzSLAM::OptimizerTick() {
             std::cout << "Robot " << robot_id_ << " Start Distributed Pose Graph Optimization" << std::endl;
          }
          optimizer_state_ = OptimizerState::Initialization;
+         number_of_optimization_steps_ ++;
          break;
       case Initialization :
          optimizer_state_ = OptimizerState::RotationEstimation;
          InitializePoseGraphOptimization();
+         number_of_optimization_steps_ ++;
          break;
       case RotationEstimation :
          if (RotationEstimationStoppingBarrier()) {
@@ -289,12 +308,14 @@ void BuzzSLAM::OptimizerTick() {
          if (current_rotation_iteration_ > number_of_steps_before_failsafe_) {
             RemoveInactiveNeighbors();
          }
-         FailSafeCheck();         
+         FailSafeCheck(); 
+         number_of_optimization_steps_ ++;        
          break;
       case PoseEstimationInitialization :
          InitializePoseEstimation();
          // Change optimizer state
          optimizer_state_ = OptimizerState::PoseEstimation;
+         number_of_optimization_steps_ ++;
          break;
       case PoseEstimation :
          if (PoseEstimationStoppingBarrier()) {
@@ -305,6 +326,7 @@ void BuzzSLAM::OptimizerTick() {
             SetPoseEstimationIsFinishedFlagsToFalse();
          }
          FailSafeCheck();
+         number_of_optimization_steps_ ++;
          break;
       case End :
          EndOptimization();
@@ -317,9 +339,11 @@ void BuzzSLAM::OptimizerTick() {
          }
          optimizer_state_ = OptimizerState::PostEndingCommunicationDelay;
          number_of_poses_at_optimization_end_ = number_of_poses_;
+         number_of_optimization_steps_ ++;
          break;
       case PostEndingCommunicationDelay :
          optimizer_state_ = OptimizerState::Idle;
+         number_of_optimization_steps_ ++;
          break;
    }
 }
@@ -384,6 +408,9 @@ void BuzzSLAM::RemoveInactiveNeighbors() {
       neighbors_lowest_id_included_in_global_map_.erase(neighbor_id);
    }
    if (neighbors_within_communication_range_.empty()) {
+      if (debug_level_ > 1) {
+         std::cout << "Robot " <<  robot_id_ << " : Stop optimization, there are inactive neighbors." << std::endl;
+      }
       AbortOptimization(false);
    }
 }
@@ -506,7 +533,7 @@ void BuzzSLAM::AddSeparatorToLocalGraph( const int& robot_1_id,
 /****************************************/
 
 void BuzzSLAM::WriteCurrentDataset() {
-   std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + ".g2o";
+   std::string dataset_file_name = log_folder_  + std::to_string(robot_id_) + ".g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
 }
 
@@ -514,9 +541,9 @@ void BuzzSLAM::WriteCurrentDataset() {
 /****************************************/
 
 void BuzzSLAM::WriteOptimizedDataset() {
-   std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized.g2o";
+   std::string dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_optimized.g2o";
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_optimized_" + std::to_string(number_of_optimization_run_) + ".g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_optimized_" + std::to_string(number_of_optimization_run_) + ".g2o";
    gtsam::writeG2o(local_pose_graph_before_optimization_, optimizer_->currentEstimate(), dataset_file_name);
    number_of_optimization_run_++;
 }
@@ -525,17 +552,17 @@ void BuzzSLAM::WriteOptimizedDataset() {
 /****************************************/
 
 void BuzzSLAM::WriteInitialDataset() {
-   std::string dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial.g2o";
+   std::string dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial.g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_" + std::to_string(number_of_optimization_run_) + ".g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_" + std::to_string(number_of_optimization_run_) + ".g2o";
    gtsam::writeG2o(*local_pose_graph_, *poses_initial_guess_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized.g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized.g2o";
    gtsam::writeG2o(*local_pose_graph_for_centralized_evaluation_, *poses_initial_guess_no_updates_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_no_filtering.g2o";
    gtsam::writeG2o(*local_pose_graph_no_filtering_, *poses_initial_guess_no_updates_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_incremental.g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_incremental.g2o";
    gtsam::writeG2o(*local_pose_graph_for_centralized_evaluation_, *poses_initial_guess_centralized_incremental_updates_, dataset_file_name);
-   dataset_file_name = "log/datasets/" + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
+   dataset_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized_no_filtering_incremental.g2o";
    gtsam::writeG2o(*local_pose_graph_no_filtering_, *poses_initial_guess_centralized_incremental_updates_, dataset_file_name);
 }
 
@@ -708,7 +735,7 @@ void BuzzSLAM::OutliersFiltering() {
          AbortOptimization(false);
       } else {
          total_outliers_rejected_ += number_of_measurements_rejected;
-         std::string outliers_rejected_file_name = "log/datasets/" + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
+         std::string outliers_rejected_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
          std::ofstream outliers_rejected_file;
          outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
          outliers_rejected_file << number_of_measurements_rejected << "\n" ;
@@ -779,6 +806,9 @@ void BuzzSLAM::UpdateCurrentPoseEstimate(const int& pose_id) {
    }
    // Register pose estimate data table as a global symbol
    Register(buzz_vm_, "current_pose_estimate", b_pose_estimate);
+
+   // Log transmitted information
+   number_of_bytes_exchanged_ += 16 * sizeof(double) + 36 * sizeof(double);
 }
 
 /****************************************/
@@ -859,6 +889,11 @@ void BuzzSLAM::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
 
          TablePut(buzz_vm_, b_rotation_estimates, table_size, b_individual_estimate);
          table_size++;
+
+         // Log transmitted information
+         number_of_bytes_exchanged_ += (sizeof robot_id_) + (sizeof robot_pose_id) +
+                                       (sizeof other_robot_id) + (sizeof optimizer_is_initialized) +
+                                       (sizeof is_estimation_done_) + 9 * sizeof(double);
       }
 
    }
@@ -875,7 +910,7 @@ void BuzzSLAM::UpdateNeighborRotationEstimates(const std::vector<std::vector<rot
          if (rotation_estimate.receiver_robot_id == robot_id_ &&
             neighbors_within_communication_range_.find(rotation_estimate.sender_robot_id) != neighbors_within_communication_range_.end()) {
             gtsam::Symbol symbol((unsigned char)(rotation_estimate.sender_robot_id+97), rotation_estimate.sender_pose_id);
-            if (other_robot_keys_for_optimization_.find(symbol.key()) != other_robot_keys_for_optimization_.end()) {
+            if (!use_pcm_ || other_robot_keys_for_optimization_.find(symbol.key()) != other_robot_keys_for_optimization_.end()) {
                gtsam::Vector rotation_matrix_vector(9);
                rotation_matrix_vector << rotation_estimate.rotation_matrix[0], rotation_estimate.rotation_matrix[1], rotation_estimate.rotation_matrix[2], 
                                        rotation_estimate.rotation_matrix[3], rotation_estimate.rotation_matrix[4], rotation_estimate.rotation_matrix[5],
@@ -885,6 +920,9 @@ void BuzzSLAM::UpdateNeighborRotationEstimates(const std::vector<std::vector<rot
                   optimizer_->updateNeighboringRobotInitialized(symbol.chr(), rotation_estimate.sender_robot_is_initialized); // Used only with flagged initialization
                }
             } else {
+               if (debug_level_ > 1) {
+                  std::cout << "Robot " <<  robot_id_ << " : Stop optimization. Key " << symbol.key() << " doesn't exist." << std::endl;
+               }
                AbortOptimization(false);
             }
          }
@@ -1032,6 +1070,11 @@ void BuzzSLAM::ComputeAndUpdatePoseEstimatesToSend(const int& rid) {
          table_size++;
 
          gtsam::Symbol debug_symbol(robot_id_char_, robot_pose_id);
+
+         // Log transmitted information
+         number_of_bytes_exchanged_ += (sizeof robot_id_) + (sizeof robot_pose_id) +
+                                       (sizeof other_robot_id) + (sizeof optimizer_is_initialized) +
+                                       (sizeof is_estimation_done_) + 6 * sizeof(double);
       }
 
    }
@@ -1138,7 +1181,11 @@ bool BuzzSLAM::PoseEstimationStoppingConditions() {
          TablePut(buzz_vm_, b_offset, i, anchor_offset_.vector()[i]);
       }
       Register(buzz_vm_, "anchor_offset", b_offset);
+
+      // Log transmitted information
+      number_of_bytes_exchanged_ += 3 * sizeof(double);
    }
+
    return pose_estimation_phase_is_finished_;
 }
 
@@ -1201,6 +1248,9 @@ void BuzzSLAM::EndOptimization() {
    b_lowest_id_included_in_global_map->i.value = lowest_id_included_in_global_map_;
    Register(buzz_vm_, "lowest_id_included_in_global_map", b_lowest_id_included_in_global_map);
 
+   // Log transmitted information
+   number_of_bytes_exchanged_ += (sizeof lowest_id_included_in_global_map_);
+
    WriteOptimizedDataset();
 }
 
@@ -1254,6 +1304,7 @@ void BuzzSLAM::UpdateAdjacencyVector() {
       }
    }
    Register(buzz_vm_, "adjacency_vector", b_adjacency_vector);
+   number_of_bytes_exchanged_ += number_of_robots_ * sizeof(int);
 }
 
 /****************************************/

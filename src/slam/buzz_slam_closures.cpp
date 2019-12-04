@@ -26,6 +26,9 @@ static int BuzzOptimizerState(buzzvm_t vm){
    int state = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->GetOptimizerState();
    buzzvm_pushi(vm, state);
 
+   // Log transmitted information
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->AddNbByteTransmitted(sizeof state);
+
    return buzzvm_ret1(vm);
 }
 
@@ -634,8 +637,10 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 15);
    buzzvm_lload(vm, 16);
    buzzvm_lload(vm, 17);
+   buzzvm_lload(vm, 18);
    /* Retrieve parameters and check their types */
-   buzzobj_t b_use_heuristics = buzzvm_stack_at(vm, 17);
+   buzzobj_t b_use_heuristics = buzzvm_stack_at(vm, 18);
+   buzzobj_t b_log_folder = buzzvm_stack_at(vm, 17);
    buzzobj_t b_optimizer_period = buzzvm_stack_at(vm, 16);
    buzzobj_t b_max_steps_rotation = buzzvm_stack_at(vm, 15);
    buzzobj_t b_max_steps_pose = buzzvm_stack_at(vm, 14);
@@ -656,8 +661,8 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       rotation_estimate_change_threshold, pose_estimate_change_threshold;
    bool use_flagged_initialization, is_simulation, incremental_solving;
    int number_of_robots, debug_level;
-   std::string error_file_name;
    double pcm_threshold;
+   std::string error_file_name, log_folder;
    bool use_pcm;
    int number_of_steps_before_failsafe;
    int max_steps_rotation, max_steps_pose;
@@ -672,6 +677,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_is_simulation->o.type == BUZZTYPE_INT &&
       b_number_of_robots->o.type == BUZZTYPE_INT &&
       b_error_file_name->o.type == BUZZTYPE_STRING &&
+      b_log_folder->o.type == BUZZTYPE_STRING &&
       b_debug->o.type == BUZZTYPE_INT &&
       b_incremental_solving->o.type == BUZZTYPE_INT &&
       b_pcm_threshold->o.type == BUZZTYPE_FLOAT &&
@@ -691,6 +697,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       is_simulation = (bool) b_is_simulation->i.value;
       number_of_robots = b_number_of_robots->i.value;
       error_file_name = b_error_file_name->s.value.str;
+      log_folder = b_log_folder->s.value.str;
       debug_level = b_debug->i.value;
       incremental_solving = b_incremental_solving->i.value;
       pcm_threshold = b_pcm_threshold->f.value;
@@ -712,7 +719,7 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->LoadParameters(optimizer_period, number_of_steps_before_failsafe,
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->LoadParameters(log_folder, optimizer_period, number_of_steps_before_failsafe,
                      use_pcm, pcm_threshold, incremental_solving, debug_level,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
@@ -732,6 +739,10 @@ static int BuzzRotationEstimationStoppingConditions(buzzvm_t vm){
    bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->RotationEstimationStoppingConditions();
    buzzvm_pushi(vm, is_finished);
 
+   // Log transmitted information
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->AddNbByteTransmitted(sizeof is_finished);
+
+
    return buzzvm_ret1(vm);
 }
 
@@ -744,6 +755,9 @@ static int BuzzPoseEstimationStoppingConditions(buzzvm_t vm){
    buzzvm_gload(vm);
    bool is_finished = BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->PoseEstimationStoppingConditions();
    buzzvm_pushi(vm, is_finished);
+
+   // Log transmitted information
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->AddNbByteTransmitted(sizeof is_finished);
 
    return buzzvm_ret1(vm);
 }
