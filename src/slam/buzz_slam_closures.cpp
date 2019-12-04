@@ -633,13 +633,15 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_lload(vm, 14);
    buzzvm_lload(vm, 15);
    buzzvm_lload(vm, 16);
+   buzzvm_lload(vm, 17);
    /* Retrieve parameters and check their types */
-   buzzobj_t b_optimizer_period = buzzvm_stack_at(vm, 15);
+   buzzobj_t b_use_heuristics = buzzvm_stack_at(vm, 17);
+   buzzobj_t b_optimizer_period = buzzvm_stack_at(vm, 16);
    buzzobj_t b_max_steps_rotation = buzzvm_stack_at(vm, 15);
    buzzobj_t b_max_steps_pose = buzzvm_stack_at(vm, 14);
    buzzobj_t b_number_of_steps_before_failsafe = buzzvm_stack_at(vm, 13);
    buzzobj_t b_use_pcm = buzzvm_stack_at(vm, 12);
-   buzzobj_t b_confidence_probability = buzzvm_stack_at(vm, 11);
+   buzzobj_t b_pcm_threshold = buzzvm_stack_at(vm, 11);
    buzzobj_t b_incremental_solving = buzzvm_stack_at(vm, 10);
    buzzobj_t b_debug = buzzvm_stack_at(vm, 9);
    buzzobj_t b_rotation_noise_std = buzzvm_stack_at(vm, 8);
@@ -655,11 +657,12 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    bool use_flagged_initialization, is_simulation, incremental_solving;
    int number_of_robots, debug_level;
    std::string error_file_name;
-   double confidence_probability;
+   double pcm_threshold;
    bool use_pcm;
    int number_of_steps_before_failsafe;
    int max_steps_rotation, max_steps_pose;
    int optimizer_period;
+   bool use_heuristics;
 
    if(b_rotation_noise_std->o.type == BUZZTYPE_FLOAT &&
       b_translation_noise_std->o.type == BUZZTYPE_FLOAT &&
@@ -671,12 +674,13 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       b_error_file_name->o.type == BUZZTYPE_STRING &&
       b_debug->o.type == BUZZTYPE_INT &&
       b_incremental_solving->o.type == BUZZTYPE_INT &&
-      b_confidence_probability->o.type == BUZZTYPE_FLOAT &&
+      b_pcm_threshold->o.type == BUZZTYPE_FLOAT &&
       b_use_pcm->o.type == BUZZTYPE_INT &&
       b_number_of_steps_before_failsafe->o.type == BUZZTYPE_INT &&
       b_max_steps_rotation->o.type == BUZZTYPE_INT &&
       b_max_steps_pose->o.type == BUZZTYPE_INT &&
-      b_optimizer_period->o.type == BUZZTYPE_INT) {
+      b_optimizer_period->o.type == BUZZTYPE_INT &&
+      b_use_heuristics->o.type == BUZZTYPE_INT) {
 
       // Fill in variables
       rotation_noise_std = b_rotation_noise_std->f.value;
@@ -689,12 +693,13 @@ static int BuzzLoadParameters(buzzvm_t vm) {
       error_file_name = b_error_file_name->s.value.str;
       debug_level = b_debug->i.value;
       incremental_solving = b_incremental_solving->i.value;
-      confidence_probability = b_confidence_probability->f.value;
+      pcm_threshold = b_pcm_threshold->f.value;
       use_pcm = (bool) b_use_pcm->i.value;
       number_of_steps_before_failsafe = b_number_of_steps_before_failsafe->i.value;
       max_steps_rotation = b_max_steps_rotation->i.value;
       max_steps_pose = b_max_steps_pose->i.value;
       optimizer_period = b_optimizer_period->i.value;
+      use_heuristics = (bool) b_use_heuristics->i.value;
 
    } else {
       buzzvm_seterror(vm,
@@ -708,12 +713,12 @@ static int BuzzLoadParameters(buzzvm_t vm) {
    buzzvm_gload(vm);
    /* Call function */
    BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->LoadParameters(optimizer_period, number_of_steps_before_failsafe,
-                     use_pcm, confidence_probability, incremental_solving, debug_level,
+                     use_pcm, pcm_threshold, incremental_solving, debug_level,
                      rotation_noise_std, translation_noise_std,
                      rotation_estimate_change_threshold, pose_estimate_change_threshold,
                      use_flagged_initialization, is_simulation,
                      number_of_robots, error_file_name,
-                     max_steps_rotation, max_steps_pose);
+                     max_steps_rotation, max_steps_pose, use_heuristics);
    return buzzvm_ret0(vm);
 }
 

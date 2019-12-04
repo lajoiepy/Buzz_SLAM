@@ -550,7 +550,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
       error_file << robots.size() << "\t" << number_of_poses << "\t" << number_of_separators << "\t" << outlier_period_ << std::boolalpha 
                << "\t" << incremental_solving_ << "\t" << rotation_noise_std_ << "\t" << translation_noise_std_ 
                << "\t" << rotation_estimate_change_threshold_ << "\t" << pose_estimate_change_threshold_ 
-               << "\t" << optimizer_period_ << "\t" << confidence_probability_
+               << "\t" << optimizer_period_ << "\t" << pcm_threshold_
                << "\t" << std::get<0>(errors) << "\t" << std::get<1>(errors) << "\t" << std::get<2>(errors) 
                << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ 
                << "\t" << inliers_outliers_added.first
@@ -792,7 +792,7 @@ void BuzzSLAMDataset::AbortOptimization(const bool& log_info){
       error_file << robots.size() << "\t" << number_of_poses << "\t" << place_holder << "\t" << outlier_period_ << std::boolalpha 
                << "\t" << incremental_solving_ << "\t" << rotation_noise_std_ << "\t" << translation_noise_std_ 
                << "\t" << rotation_estimate_change_threshold_ << "\t" << pose_estimate_change_threshold_ 
-               << "\t" << optimizer_period_ << "\t" << confidence_probability_
+               << "\t" << optimizer_period_ << "\t" << pcm_threshold_
                << "\t" << place_holder << "\t" << place_holder << "\t" << place_holder 
                << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ 
                << "\t" << inliers_outliers_added.first

@@ -79,12 +79,13 @@ void BuzzSLAM::Init(buzzvm_t buzz_vm) {
 /****************************************/
 
 void BuzzSLAM::LoadParameters( const int& period, const int& number_of_steps_before_failsafe, const bool& use_pcm,
-                                                const double& confidence_probability, const bool& incremental_solving, const int& debug,
+                                                const double& pcm_threshold, const bool& incremental_solving, const int& debug,
                                                 const float& rotation_noise_std, const float& translation_noise_std,
                                                 const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                                                 const bool& use_flagged_initialization, const bool& is_simulation,
                                                 const int& number_of_robots, const std::string& error_file_name,
-                                                const int& max_number_of_rotation_estimation_steps, const int& max_number_of_pose_estimation_steps) {
+                                                const int& max_number_of_rotation_estimation_steps, const int& max_number_of_pose_estimation_steps,
+                                                const bool& use_heuristics) {
    rotation_noise_std_ = rotation_noise_std;
    translation_noise_std_ = translation_noise_std;
    rotation_estimate_change_threshold_ = rotation_estimate_change_threshold;
@@ -96,13 +97,14 @@ void BuzzSLAM::LoadParameters( const int& period, const int& number_of_steps_bef
    error_file_name_ = error_file_name;
    debug_level_ = debug;
    incremental_solving_ = incremental_solving;
-   confidence_probability_ = confidence_probability;
+   pcm_threshold_ = pcm_threshold;
    use_pcm_ = use_pcm;
    number_of_steps_before_failsafe_ = number_of_steps_before_failsafe;
    max_number_of_rotation_estimation_steps_ = max_number_of_rotation_estimation_steps;
    max_number_of_pose_estimation_steps_ = max_number_of_pose_estimation_steps;
 
    optimizer_period_ = period;
+   use_heuristics_ = use_heuristics;
 }
 
 /****************************************/
@@ -685,7 +687,7 @@ void BuzzSLAM::OutliersFiltering() {
          if (pose_estimates_from_neighbors_.count(robot) > 0) {
             auto max_clique_info = distributed_pcm::DistributedPCM::solveDecentralized(robot, optimizer_,
                                  graph_and_values_, robot_local_map_, pose_estimates_from_neighbors_.at(robot),
-                                 confidence_probability_, is_prior_added_);
+                                 pcm_threshold_, is_prior_added_, use_heuristics_);
          
             number_of_measurements_accepted += max_clique_info.first.first;
             number_of_measurements_rejected += max_clique_info.first.second;

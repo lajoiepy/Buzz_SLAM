@@ -66,12 +66,13 @@ public:
    void Init(buzzvm_t buzz_vm);
 
    void LoadParameters( const int& period, const int& number_of_steps_before_failsafe, const bool& use_pcm,
-                        const double& confidence_probability, const bool& incremental_solving, const int& debug,
+                        const double& pcm_threshold, const bool& incremental_solving, const int& debug,
                         const float& rotation_noise_std, const float& translation_noise_std,
                         const float& rotation_estimate_change_threshold, const float& pose_estimate_change_threshold,
                         const bool& use_flagged_initialization, const bool& is_simulation,
                         const int& number_of_robots, const std::string& error_file_name,
-                        const int& max_number_of_rotation_estimation_steps, const int& max_number_of_pose_estimation_steps);
+                        const int& max_number_of_rotation_estimation_steps, const int& max_number_of_pose_estimation_steps,
+                        const bool& use_heuristics);
 
    // Functions related to the measurements
    void AddSeparatorToLocalGraph( const int& robot_1_id,
@@ -333,9 +334,11 @@ protected:
    int number_of_robots_;
 
    // Pairwise consistency maximization parameters
-   double confidence_probability_;
+   double pcm_threshold_;
 
    bool use_pcm_;
+
+   bool use_heuristics_;
 
    // Parameter for evaluation
    bool is_simulation_;
