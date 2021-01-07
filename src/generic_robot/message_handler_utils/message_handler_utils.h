@@ -2,7 +2,7 @@
 #define MESSAGE_HANDLER_UTILS_H
 
 #include <ros/ros.h>
-#include <rtabmap_ros/OdomInfo.h>
+#include <nav_msgs/Odometry.h>
 #include <multi_robot_separators/ReceiveSeparators.h>
 #include <multi_robot_separators/PoseEstimates.h>
 #include "../../slam/buzz_slam_singleton.h"

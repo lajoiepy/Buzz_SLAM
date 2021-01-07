@@ -17,12 +17,12 @@ static void ctrlc_handler(int sig) {
    done = 1;
 }
 
-static void add_odometry(const rtabmap_ros::OdomInfo::ConstPtr &msg)
+static void add_odometry(const nav_msgs::Odometry::ConstPtr &msg)
 {
    // Fill the received transform with the converted pose and covariance
    graph_utils::PoseWithCovariance measurement;
-   transform_to_pose3(msg->transform, measurement.pose);
-   covariance_to_matrix(msg->covariance, measurement.covariance_matrix);
+   pose_ros_to_gtsam(msg->pose.pose, measurement.pose);
+   covariance_to_matrix(msg->pose.covariance, measurement.covariance_matrix);
 
    // Accumulate the transforms
    poseCompose(accumulated_measurement_,
@@ -30,14 +30,14 @@ static void add_odometry(const rtabmap_ros::OdomInfo::ConstPtr &msg)
                accumulated_measurement_);
 
    // Add a node if the current frame is a keyframe
-   if (msg->keyFrameAdded)
-   {
+   //if (msg->keyFrameAdded) // TODO: double check
+   //{
       set_covariance_matrix(accumulated_measurement_.covariance_matrix, rotation_std_, translation_std_);
 
       buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->AddOdometryMeasurement(accumulated_measurement_.pose, accumulated_measurement_.covariance_matrix);
       ROS_INFO("Add odometry measurement");
       accumulated_measurement_.pose = gtsam::Pose3();
-   }
+   //}
 }
 
 static bool add_separators(multi_robot_separators::ReceiveSeparators::Request &req,
