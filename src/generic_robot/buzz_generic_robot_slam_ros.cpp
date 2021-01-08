@@ -40,8 +40,8 @@ static void add_odometry(const nav_msgs::Odometry::ConstPtr &msg)
    //}
 }
 
-static bool add_separators(multi_robot_separators::ReceiveSeparators::Request &req,
-                          multi_robot_separators::ReceiveSeparators::Response &res)
+static bool add_separators(loop_closure_transform::ReceiveSeparators::Request &req,
+                          loop_closure_transform::ReceiveSeparators::Response &res)
 {
    for (int idx = 0; idx < req.kf_ids_from.size(); idx++)
    {
@@ -78,8 +78,8 @@ static bool add_separators(multi_robot_separators::ReceiveSeparators::Request &r
    return true;
 }
 
-static bool get_pose_estimates(multi_robot_separators::PoseEstimates::Request &req,
-                          multi_robot_separators::PoseEstimates::Response &res)
+static bool get_pose_estimates(loop_closure_transform::PoseEstimates::Request &req,
+                          loop_closure_transform::PoseEstimates::Response &res)
 {
    ROS_INFO("Get pose estimate");
    std::vector<geometry_msgs::PoseWithCovariance> pose_estimates;

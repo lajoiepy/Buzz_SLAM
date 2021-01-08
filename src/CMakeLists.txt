@@ -149,7 +149,7 @@ add_executable(generic_robot_buzz_slam_node
   generic_robot/utils/buzz_utils.h
   generic_robot/message_handler_utils/message_handler_utils.h
   generic_robot/buzz_generic_robot_slam_ros.cpp)
-find_library(MULTIROBOT_SEPARATORS_LIBRARY multi_robot_separators HINTS /root/multi_robot_SLAM_separators/ros_ws/devel/lib)
+find_library(MULTIROBOT_SEPARATORS_LIBRARY loop_closure_transform HINTS /root/multi_robot_SLAM_separators/ros_ws/devel/lib)
 target_link_libraries(generic_robot_buzz_slam_node 
   buzz
   buzzdbg

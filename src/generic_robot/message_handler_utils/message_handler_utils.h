@@ -3,8 +3,8 @@
 
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
-#include <multi_robot_separators/ReceiveSeparators.h>
-#include <multi_robot_separators/PoseEstimates.h>
+#include <loop_closure_transform/ReceiveSeparators.h>
+#include <loop_closure_transform/PoseEstimates.h>
 #include "../../slam/buzz_slam_singleton.h"
 
 void transform_to_pose3(const geometry_msgs::Transform &msg, gtsam::Pose3 &pose3_out)
