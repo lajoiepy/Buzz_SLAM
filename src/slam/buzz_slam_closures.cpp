@@ -519,7 +519,7 @@ static int BuzzRandUniform(buzzvm_t vm){
 /****************************************/
 /****************************************/
 
-static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
+static int BuzzAddloopclosureToLocalGraph(buzzvm_t vm) {
    /* Push the vector components */
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
@@ -591,7 +591,7 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
    } else {
       buzzvm_seterror(vm,
                       BUZZVM_ERROR_TYPE,
-                      "wrong parameter type for add_separator_to_local_graph."
+                      "wrong parameter type for add_loopclosure_to_local_graph."
          );
       return vm->state;
    }
@@ -607,7 +607,7 @@ static int BuzzAddSeparatorToLocalGraph(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "controller", 1));
    buzzvm_gload(vm);
    /* Call function */
-   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->AddSeparatorToLocalGraph( robot_1_id, robot_2_id,
+   BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<BuzzSLAM>(vm->robot)->AddloopclosureToLocalGraph( robot_1_id, robot_2_id,
                                                                                                             robot_1_pose_id, robot_2_pose_id,
                                                                                                             x, y, z,
                                                                                                             q_x, q_y, q_z, q_w,
@@ -1001,8 +1001,8 @@ buzzvm_state BuzzSLAM::RegisterSLAMFunctions(buzzvm_t buzz_vm) {
    buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzRandUniform));
    buzzvm_gstore(buzz_vm);
 
-   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "add_separator_to_local_graph", 1));
-   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzAddSeparatorToLocalGraph));
+   buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "add_loopclosure_to_local_graph", 1));
+   buzzvm_pushcc(buzz_vm, buzzvm_function_register(buzz_vm, BuzzAddloopclosureToLocalGraph));
    buzzvm_gstore(buzz_vm);
    
    buzzvm_pushs(buzz_vm, buzzvm_string_register(buzz_vm, "init_optimizer", 1));

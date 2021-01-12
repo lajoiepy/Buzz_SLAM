@@ -20,9 +20,9 @@ public:
    virtual void Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt);
 
    // Fake measurements generation
-   int AddSeparatorMeasurement();
+   int AddloopclosureMeasurement();
 
-   int AddSeparatorMeasurementOutlier();
+   int AddloopclosureMeasurementOutlier();
 
    void LoadParameters(const std::string& dataset_name, const double& sensor_range, const int& outlier_period);
 

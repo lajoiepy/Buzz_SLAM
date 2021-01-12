@@ -20,7 +20,7 @@ public:
    virtual void Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt);
 
    // Fake measurements generation
-   int ComputeNoisyFakeSeparatorMeasurement(const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt, 
+   int ComputeNoisyFakeloopclosureMeasurement(const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt, 
                                           const int& pose_id, const int& robot_id, const int& this_robot_pose_id);
 
    void LoadParameters(const double& sensor_range, const double& outlier_probability);

@@ -3,7 +3,8 @@
 
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
-#include <loop_closure_transform/ReceiveSeparators.h>
+#include <geometry_msgs/Transform.h>
+#include <loop_closure_transform/ReceiveLoopClosures.h>
 #include <loop_closure_transform/PoseEstimates.h>
 #include "../../slam/buzz_slam_singleton.h"
 

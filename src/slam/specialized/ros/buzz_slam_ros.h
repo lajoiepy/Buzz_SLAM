@@ -20,9 +20,9 @@ public:
 
    virtual void Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gtsam::Rot3& R_gt);
 
-   int AddSeparatorMeasurement(const gtsam::BetweenFactor<gtsam::Pose3>& separator_factor);
+   int AddloopclosureMeasurement(const gtsam::BetweenFactor<gtsam::Pose3>& loopclosure_factor);
 
-   int AddSeparatorMeasurementOutlier();
+   int AddloopclosureMeasurementOutlier();
 
    void LoadParameters(const double& sensor_range, const int& outlier_period);
 

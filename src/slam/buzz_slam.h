@@ -75,7 +75,7 @@ public:
                         const bool& use_heuristics);
 
    // Functions related to the measurements
-   void AddSeparatorToLocalGraph( const int& robot_1_id,
+   void AddloopclosureToLocalGraph( const int& robot_1_id,
                                     const int& robot_2_id,
                                     const int& robot_1_pose_id,
                                     const int& robot_2_pose_id,
@@ -144,7 +144,7 @@ public:
 
 protected:
    // Functions for link with buzz VM
-   void UpdateCurrentSeparatorBuzzStructure( const int& robot_1_id,
+   void UpdateCurrentloopclosureBuzzStructure( const int& robot_1_id,
                                              const int& robot_2_id,
                                              const int& robot_1_pose_id,
                                              const int& robot_2_pose_id,
@@ -215,7 +215,7 @@ protected:
 
    void IncrementalInitialGuessUpdate(const gtsam::Values& new_poses, boost::shared_ptr<gtsam::Values>& poses_to_be_updated);
 
-   void IncrementNumberOfSeparatorsWithOtherRobot(const int& other_robot_id);
+   void IncrementNumberOfloopclosuresWithOtherRobot(const int& other_robot_id);
 
    void ComputeOptimizationOrder();
 
@@ -287,7 +287,7 @@ protected:
 
    std::map<int, graph_utils::Trajectory> pose_estimates_from_neighbors_;
 
-   std::map<int, int> number_of_separators_with_each_robot_;
+   std::map<int, int> number_of_loopclosures_with_each_robot_;
 
    bool is_prior_added_;
 

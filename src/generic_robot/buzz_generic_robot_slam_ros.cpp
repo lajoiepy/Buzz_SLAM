@@ -40,8 +40,8 @@ static void add_odometry(const nav_msgs::Odometry::ConstPtr &msg)
    //}
 }
 
-static bool add_separators(loop_closure_transform::ReceiveSeparators::Request &req,
-                          loop_closure_transform::ReceiveSeparators::Response &res)
+static bool add_loopclosures(loop_closure_transform::ReceiveLoopClosures::Request &req,
+                          loop_closure_transform::ReceiveLoopClosures::Response &res)
 {
    for (int idx = 0; idx < req.kf_ids_from.size(); idx++)
    {
@@ -53,16 +53,16 @@ static bool add_separators(loop_closure_transform::ReceiveSeparators::Request &r
       robot_symbol_to = gtsam::Symbol('a' + req.robot_to_id, req.kf_ids_to[idx]);
 
       gtsam::Pose3 measurement;
-      pose_ros_to_gtsam(req.separators[idx].pose, measurement);
+      pose_ros_to_gtsam(req.loopclosures[idx].pose, measurement);
 
       gtsam::Matrix covariance_matrix;
       set_covariance_matrix(covariance_matrix, rotation_std_, translation_std_);
 
       gtsam::SharedNoiseModel noise_model = gtsam::noiseModel::Gaussian::Covariance(covariance_matrix);
 
-      ROS_INFO("Add separator, %llu, %llu", robot_symbol_from.key(), robot_symbol_to.key());
+      ROS_INFO("Add loopclosure, %llu, %llu", robot_symbol_from.key(), robot_symbol_to.key());
       gtsam::BetweenFactor<gtsam::Pose3> new_factor = gtsam::BetweenFactor<gtsam::Pose3>(robot_symbol_from, robot_symbol_to, measurement, noise_model);
-      buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->AddSeparatorMeasurement(new_factor);
+      buzz_slam::BuzzSLAMSingleton::GetInstance().GetBuzzSLAM<buzz_slam::BuzzSLAMRos>(VM->robot)->AddloopclosureMeasurement(new_factor);
 
       if (VM->robot == req.robot_from_id) {
          graph_utils::PoseWithCovariance pose;
@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
       accumulated_measurement_.pose = gtsam::Pose3();
       accumulated_measurement_.covariance_matrix = gtsam::eye(6,6);
       ros::Subscriber sub_odom = nh_.subscribe("odom_info", 1000, &add_odometry);
-      ros::ServiceServer s_add_separators = nh_.advertiseService("add_separators_pose_graph", &add_separators);
+      ros::ServiceServer s_add_loopclosures = nh_.advertiseService("add_loopclosures_pose_graph", &add_loopclosures);
       ros::ServiceServer s_get_pose_estimates = nh_.advertiseService("get_pose_estimates", &get_pose_estimates);
       ros::ServiceServer s_trigger_optimization = nh_.advertiseService("start_optimization", &trigger_optimization);
 

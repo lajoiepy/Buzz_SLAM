@@ -149,7 +149,8 @@ add_executable(generic_robot_buzz_slam_node
   generic_robot/utils/buzz_utils.h
   generic_robot/message_handler_utils/message_handler_utils.h
   generic_robot/buzz_generic_robot_slam_ros.cpp)
-find_library(MULTIROBOT_SEPARATORS_LIBRARY loop_closure_transform HINTS /root/multi_robot_SLAM_separators/ros_ws/devel/lib)
+find_library(loop_closure_transform_LIBRARY loop_closure_transform HINTS /root/door-slam-2-ws/devel/lib)
+#find_library(distributed_loop_closure_detection_LIBRARY distributed_loop_closure_detection HINTS /root/door-slam-2-ws/devel/lib)
 target_link_libraries(generic_robot_buzz_slam_node 
   buzz
   buzzdbg
@@ -163,7 +164,10 @@ target_link_libraries(generic_robot_buzz_slam_node
   graph_utils
   -lpthread
   ${catkin_LIBRARIES}
-  ${MULTIROBOT_SEPARATORS_LIBRARY}
+  /root/door-slam-2-ws/devel/lib/libloop_closure_transform.so
+  #${distributed_loop_closure_detection_LIBRARY}
   )
+
+  
 install(TARGETS generic_robot_buzz_slam_node RUNTIME DESTINATION bin)
 endif(ROS_IRL_ROBOT)

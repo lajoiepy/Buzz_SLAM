@@ -63,7 +63,7 @@ void BuzzSLAM::Init(buzzvm_t buzz_vm) {
    std::remove(log_file_name.c_str());
    log_file_name = log_folder_  + std::to_string(robot_id_) + "_optimized.g2o";
    std::remove(log_file_name.c_str());
-   log_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
+   log_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_loopclosures_rejected.g2o";
    std::remove(log_file_name.c_str());
    log_file_name = log_folder_  + std::to_string(robot_id_) + "_initial_centralized.g2o";
    std::remove(log_file_name.c_str());
@@ -136,7 +136,7 @@ void BuzzSLAM::AddNbByteTransmitted(const int nb_bytes) {
 /****************************************/
 /****************************************/
 
-void BuzzSLAM::UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
+void BuzzSLAM::UpdateCurrentloopclosureBuzzStructure(  const int& robot_1_id,
                                              const int& robot_2_id,
                                              const int& robot_1_pose_id,
                                              const int& robot_2_pose_id,
@@ -149,21 +149,21 @@ void BuzzSLAM::UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
                                              const double& q_w,
                                              const gtsam::Matrix6& covariance_matrix ) {
    // Create empty data table
-   buzzobj_t b_separator_measurement = buzzheap_newobj(buzz_vm_, BUZZTYPE_TABLE);
+   buzzobj_t b_loopclosure_measurement = buzzheap_newobj(buzz_vm_, BUZZTYPE_TABLE);
    // Store symbol information
-   TablePut(buzz_vm_, b_separator_measurement, "robot_1_id", robot_1_id);
-   TablePut(buzz_vm_, b_separator_measurement, "robot_2_id", robot_2_id);
-   TablePut(buzz_vm_, b_separator_measurement, "robot_1_pose_id", robot_1_pose_id);
-   TablePut(buzz_vm_, b_separator_measurement, "robot_2_pose_id", robot_2_pose_id);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "robot_1_id", robot_1_id);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "robot_2_id", robot_2_id);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "robot_1_pose_id", robot_1_pose_id);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "robot_2_pose_id", robot_2_pose_id);
    // Store position data
-   TablePut(buzz_vm_, b_separator_measurement, "x", x);
-   TablePut(buzz_vm_, b_separator_measurement, "y", y);
-   TablePut(buzz_vm_, b_separator_measurement, "z", z);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "x", x);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "y", y);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "z", z);
    // Store orientation data
-   TablePut(buzz_vm_, b_separator_measurement, "q_x", q_x);
-   TablePut(buzz_vm_, b_separator_measurement, "q_y", q_y);
-   TablePut(buzz_vm_, b_separator_measurement, "q_z", q_z);
-   TablePut(buzz_vm_, b_separator_measurement, "q_w", q_w);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "q_x", q_x);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "q_y", q_y);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "q_z", q_z);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "q_w", q_w);
    // Store covariance matrix
    buzzobj_t b_covariance_matrix = buzzheap_newobj(buzz_vm_, BUZZTYPE_TABLE);
    for (int i = 0; i < 6; i++) {
@@ -172,10 +172,10 @@ void BuzzSLAM::UpdateCurrentSeparatorBuzzStructure(  const int& robot_1_id,
          TablePut(buzz_vm_, b_covariance_matrix, i*6 + j, matrix_elem);
       }
    }
-   TablePut(buzz_vm_, b_separator_measurement, "covariance_matrix", b_covariance_matrix);
+   TablePut(buzz_vm_, b_loopclosure_measurement, "covariance_matrix", b_covariance_matrix);
 
    // Register positioning data table as global symbol
-   Register(buzz_vm_, "current_separator_measurement", b_separator_measurement);
+   Register(buzz_vm_, "current_loopclosure_measurement", b_loopclosure_measurement);
 
    // Log transmitted information
    number_of_bytes_exchanged_ += (sizeof robot_1_id) + (sizeof robot_2_id) +
@@ -484,7 +484,7 @@ bool BuzzSLAM::AllRobotsAreInitialized() {
 /****************************************/
 /****************************************/
 
-void BuzzSLAM::AddSeparatorToLocalGraph( const int& robot_1_id,
+void BuzzSLAM::AddloopclosureToLocalGraph( const int& robot_1_id,
                                  const int& robot_2_id,
                                  const int& robot_1_pose_id,
                                  const int& robot_2_pose_id,
@@ -497,7 +497,7 @@ void BuzzSLAM::AddSeparatorToLocalGraph( const int& robot_1_id,
                                  const double& q_w,
                                  const gtsam::Matrix6& covariance_matrix ) {
 
-   // Separator symbols
+   // loopclosure symbols
    unsigned char robot_1_id_char = (unsigned char)(97 + robot_1_id);
    AddNewKnownRobot(robot_1_id_char);
    gtsam::Symbol robot_1_symbol = gtsam::Symbol(robot_1_id_char, robot_1_pose_id);
@@ -525,8 +525,8 @@ void BuzzSLAM::AddSeparatorToLocalGraph( const int& robot_1_id,
    robot_local_map_.addTransform(new_factor, covariance_matrix);
 
    // Add info for flagged initialization
-   IncrementNumberOfSeparatorsWithOtherRobot(robot_1_id);
-   IncrementNumberOfSeparatorsWithOtherRobot(robot_2_id);
+   IncrementNumberOfloopclosuresWithOtherRobot(robot_1_id);
+   IncrementNumberOfloopclosuresWithOtherRobot(robot_2_id);
 }
 
 /****************************************/
@@ -689,13 +689,13 @@ void BuzzSLAM::UpdateOptimizer() {
    if (neighboring_robots.size() > 0) {
       disconnected_graph_ = false;
    }
-   bool has_separator_with_neighbor = false;
+   bool has_loopclosure_with_neighbor = false;
    for (const auto& neighbor : neighbors_within_communication_range_) {
       if (neighboring_robots.find((char)(neighbor+97)) != neighboring_robots.end()) {
-         has_separator_with_neighbor = true;
+         has_loopclosure_with_neighbor = true;
       }
    }
-   if (!has_separator_with_neighbor) {
+   if (!has_loopclosure_with_neighbor) {
       optimizer_state_ = OptimizerState::Idle;
    }   
 }
@@ -729,13 +729,13 @@ void BuzzSLAM::OutliersFiltering() {
       }
       if (number_of_measurements_accepted < 4) {
          if (debug_level_ >= 1) {
-            std::cout << "Robot " << robot_id_ << " Outliers filtering, not enough separators accepted : stop estimation" << std::endl;
+            std::cout << "Robot " << robot_id_ << " Outliers filtering, not enough loopclosures accepted : stop estimation" << std::endl;
          }
          SaveInitialGraph();
          AbortOptimization(false);
       } else {
          total_outliers_rejected_ += number_of_measurements_rejected;
-         std::string outliers_rejected_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_separators_rejected.g2o";
+         std::string outliers_rejected_file_name = log_folder_  + std::to_string(robot_id_) + "_number_of_loopclosures_rejected.g2o";
          std::ofstream outliers_rejected_file;
          outliers_rejected_file.open(outliers_rejected_file_name, std::ios::trunc);
          outliers_rejected_file << number_of_measurements_rejected << "\n" ;
@@ -861,9 +861,9 @@ void BuzzSLAM::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
    // for each loop closure
    // share Key, linearized rotation, is init
    int table_size = 0;
-   for (const std::pair<gtsam::Symbol, gtsam::Symbol>& separator_symbols: optimizer_->separatorsSymbols()) {
+   for (const std::pair<gtsam::Symbol, gtsam::Symbol>& loopclosure_symbols: optimizer_->separatorsSymbols()) {
 
-      gtsam::Symbol other_robot_symbol = separator_symbols.first;
+      gtsam::Symbol other_robot_symbol = loopclosure_symbols.first;
       int other_robot_id = (int)(other_robot_symbol.chr() - 97);
 
       if (rid == other_robot_id) {
@@ -872,13 +872,13 @@ void BuzzSLAM::ComputeAndUpdateRotationEstimatesToSend(const int& rid) {
          buzzobj_t b_individual_estimate = buzzheap_newobj(buzz_vm_, BUZZTYPE_TABLE);
 
          TablePut(buzz_vm_, b_individual_estimate, "sender_robot_id", robot_id_);
-         int robot_pose_id = separator_symbols.second.index();
+         int robot_pose_id = loopclosure_symbols.second.index();
          TablePut(buzz_vm_, b_individual_estimate, "sender_pose_id", robot_pose_id);
          TablePut(buzz_vm_, b_individual_estimate, "receiver_robot_id", other_robot_id);
          TablePut(buzz_vm_, b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
          TablePut(buzz_vm_, b_individual_estimate, "sender_estimation_is_done", (int) is_estimation_done_);
 
-         gtsam::Vector rotation_estimate = optimizer_->linearizedRotationAt(separator_symbols.second.key());
+         gtsam::Vector rotation_estimate = optimizer_->linearizedRotationAt(loopclosure_symbols.second.key());
          buzzobj_t b_individual_estimate_rotation = buzzheap_newobj(buzz_vm_, BUZZTYPE_TABLE);
 
          for (int rotation_elem_index = 0; rotation_elem_index < 9; rotation_elem_index++) {
@@ -1040,9 +1040,9 @@ void BuzzSLAM::ComputeAndUpdatePoseEstimatesToSend(const int& rid) {
    // for each loop closure
    //  Key, linearized pose, is init
    int table_size = 0;
-   for (const std::pair<gtsam::Symbol, gtsam::Symbol>& separator_symbols: optimizer_->separatorsSymbols()) {
+   for (const std::pair<gtsam::Symbol, gtsam::Symbol>& loopclosure_symbols: optimizer_->separatorsSymbols()) {
 
-      gtsam::Symbol other_robot_symbol = separator_symbols.first;
+      gtsam::Symbol other_robot_symbol = loopclosure_symbols.first;
       int other_robot_id = (int)(other_robot_symbol.chr() - 97);
 
       if (rid == other_robot_id) {
@@ -1051,13 +1051,13 @@ void BuzzSLAM::ComputeAndUpdatePoseEstimatesToSend(const int& rid) {
          buzzobj_t b_individual_estimate = buzzheap_newobj(buzz_vm_, BUZZTYPE_TABLE);
 
          TablePut(buzz_vm_, b_individual_estimate, "sender_robot_id", robot_id_);
-         int robot_pose_id = separator_symbols.second.index();
+         int robot_pose_id = loopclosure_symbols.second.index();
          TablePut(buzz_vm_, b_individual_estimate, "sender_pose_id", robot_pose_id);
          TablePut(buzz_vm_, b_individual_estimate, "receiver_robot_id", other_robot_id);
          TablePut(buzz_vm_, b_individual_estimate, "sender_robot_is_initialized", (int) optimizer_is_initialized);
          TablePut(buzz_vm_, b_individual_estimate, "sender_estimation_is_done", (int) is_estimation_done_);
 
-         gtsam::Vector pose_estimate = optimizer_->linearizedPosesAt(separator_symbols.second.key());
+         gtsam::Vector pose_estimate = optimizer_->linearizedPosesAt(loopclosure_symbols.second.key());
          buzzobj_t b_individual_estimate_pose = buzzheap_newobj(buzz_vm_, BUZZTYPE_TABLE);
 
          for (int pose_elem_index = 0; pose_elem_index < 6; pose_elem_index++) {
@@ -1280,12 +1280,12 @@ void BuzzSLAM::IncrementalInitialGuessUpdate(const gtsam::Values& new_poses, boo
 /****************************************/
 /****************************************/
 
-void BuzzSLAM::IncrementNumberOfSeparatorsWithOtherRobot(const int& other_robot_id) {
+void BuzzSLAM::IncrementNumberOfloopclosuresWithOtherRobot(const int& other_robot_id) {
    if (other_robot_id != robot_id_) {
-      if (number_of_separators_with_each_robot_.count(other_robot_id) == 0) {
-         number_of_separators_with_each_robot_.insert(std::make_pair(other_robot_id, 1));
+      if (number_of_loopclosures_with_each_robot_.count(other_robot_id) == 0) {
+         number_of_loopclosures_with_each_robot_.insert(std::make_pair(other_robot_id, 1));
       } else {
-         number_of_separators_with_each_robot_[other_robot_id] = number_of_separators_with_each_robot_[other_robot_id] + 1;
+         number_of_loopclosures_with_each_robot_[other_robot_id] = number_of_loopclosures_with_each_robot_[other_robot_id] + 1;
       }
    }
 }
@@ -1296,11 +1296,11 @@ void BuzzSLAM::IncrementNumberOfSeparatorsWithOtherRobot(const int& other_robot_
 void BuzzSLAM::UpdateAdjacencyVector() {
    buzzobj_t b_adjacency_vector = buzzheap_newobj(buzz_vm_, BUZZTYPE_TABLE);
    for (int i = 0; i < number_of_robots_; i++) {
-      if (number_of_separators_with_each_robot_.count(i) == 0) {
+      if (number_of_loopclosures_with_each_robot_.count(i) == 0) {
          TablePut(buzz_vm_, b_adjacency_vector, i, 0);         
       } else {
-         TablePut(buzz_vm_, b_adjacency_vector, i, number_of_separators_with_each_robot_[i]);
-         adjacency_matrix_(robot_id_, i) = number_of_separators_with_each_robot_[i];
+         TablePut(buzz_vm_, b_adjacency_vector, i, number_of_loopclosures_with_each_robot_[i]);
+         adjacency_matrix_(robot_id_, i) = number_of_loopclosures_with_each_robot_[i];
       }
    }
    Register(buzz_vm_, "adjacency_vector", b_adjacency_vector);

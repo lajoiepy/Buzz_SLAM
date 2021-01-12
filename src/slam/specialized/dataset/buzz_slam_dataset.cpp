@@ -48,11 +48,11 @@ void BuzzSLAMDataset::Init(buzzvm_t buzz_vm, const gtsam::Point3& t_gt, const gt
       // Write results to csv
       std::ofstream error_file;
       error_file.open(error_file_name_, std::ios::out | std::ios::app);
-      error_file << "NumberOfRobots\tNumberOfPoses\tNumberOfSeparators\tOutlierPeriod\tUsesIncrementalSolving"
+      error_file << "NumberOfRobots\tNumberOfPoses\tNumberOfloopclosures\tOutlierPeriod\tUsesIncrementalSolving"
          "\tRotationNoiseStd\tTranslationNoiseStd\tRotationChangeThreshold\tPoseChangeThreshold"
          "\tOptimizerPeriod\tChiSquaredProbability"
          "\tErrorCentralized\tErrorDecentralized\tErrorInitial\tNumberOfRotationIterations\tNumberOfPoseIterations"
-         "\tNumberOfInliers\tNumberOfOutliers\tNumberOfSeparatorsRejected\tNumberOfOutliersNotRejected\n";
+         "\tNumberOfInliers\tNumberOfOutliers\tNumberOfloopclosuresRejected\tNumberOfOutliersNotRejected\n";
       error_file.close();
    }
    std::string log_file_name = log_folder_  + std::to_string(robot_id_) + "_inliers_added_keys.g2o";
@@ -208,11 +208,11 @@ gtsam::Pose3 BuzzSLAMDataset::OutlierMeasurement(const gtsam::Rot3& R, const gts
 /****************************************/
 /****************************************/
 
-int BuzzSLAMDataset::AddSeparatorMeasurement() {
+int BuzzSLAMDataset::AddloopclosureMeasurement() {
    if (loop_closure_linked_to_key_.count(previous_symbol_.key()) == 0) {
       return 0;
    }
-   // Separator symbols
+   // loopclosure symbols
    auto loop_closure_keys = loop_closure_linked_to_key_.at(previous_symbol_.key());
 
    AddNewKnownRobot(gtsam::Symbol(loop_closure_keys.first).chr());
@@ -224,7 +224,7 @@ int BuzzSLAMDataset::AddSeparatorMeasurement() {
    number_of_inliers_added_++;
 
    auto covariance_matrix = boost::dynamic_pointer_cast< gtsam::noiseModel::Gaussian >(new_factor->noiseModel())->covariance();
-   UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
+   UpdateCurrentloopclosureBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
                                           (int)(gtsam::Symbol(loop_closure_keys.second).chr() - 97),
                                           gtsam::Symbol(loop_closure_keys.first).index(),
                                           gtsam::Symbol(loop_closure_keys.second).index(),
@@ -248,8 +248,8 @@ int BuzzSLAMDataset::AddSeparatorMeasurement() {
    covariance_matrix_for_outlier_ = covariance_matrix;
 
    // Add info for flagged initialization
-   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.first).chr() - 97);
-   IncrementNumberOfSeparatorsWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
+   IncrementNumberOfloopclosuresWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.first).chr() - 97);
+   IncrementNumberOfloopclosuresWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
    IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.first).chr() - 97);
    IncrementNumberOfInliersWithOtherRobot((int) gtsam::Symbol(loop_closure_keys.second).chr() - 97);
 
@@ -285,8 +285,8 @@ void BuzzSLAMDataset::IncrementNumberOfInliersWithOtherRobot(const int& other_ro
 /****************************************/
 /****************************************/
 
-int BuzzSLAMDataset::AddSeparatorMeasurementOutlier() {
-   // Separator symbols
+int BuzzSLAMDataset::AddloopclosureMeasurementOutlier() {
+   // loopclosure symbols
    if (known_other_robots_.empty() || dataset_reading_ended_){
       return 0;
    }
@@ -305,7 +305,7 @@ int BuzzSLAMDataset::AddSeparatorMeasurementOutlier() {
    gtsam::Pose3 measurement = OutlierMeasurement(gtsam::Rot3(), gtsam::Point3());
    boost::shared_ptr<gtsam::BetweenFactor<gtsam::Pose3>> new_factor = boost::make_shared<gtsam::BetweenFactor<gtsam::Pose3>>(gtsam::Symbol(loop_closure_keys.first), gtsam::Symbol(loop_closure_keys.second), measurement, gtsam::noiseModel::Gaussian::Covariance(covariance_matrix_for_outlier_));
 
-   UpdateCurrentSeparatorBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
+   UpdateCurrentloopclosureBuzzStructure(   (int)(gtsam::Symbol(loop_closure_keys.first).chr() - 97),
                                           (int)(gtsam::Symbol(loop_closure_keys.second).chr() - 97),
                                           gtsam::Symbol(loop_closure_keys.first).index(),
                                           gtsam::Symbol(loop_closure_keys.second).index(),
@@ -461,7 +461,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
    auto aggregated_outliers_keys = AggregateOutliersKeys(robots);
    gtsam::Values distributed;
    std::vector<gtsam::GraphAndValues> graph_and_values_vec;
-   int number_of_separators = 0;
+   int number_of_loopclosures = 0;
    int number_of_outliers_not_rejected = 0;
    for (const auto& i : robots) {
       std::string dataset_file_name = log_folder_  + std::to_string(i) + "_optimized.g2o";
@@ -494,7 +494,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
          auto robot_2_id = gtsam::Symbol(pose3_between->key2()).chr();
          if (robot_1_id != robot_2_id) {
             if (robots.find(((int)robot_1_id-97)) != robots.end() && robots.find(((int)robot_2_id-97)) != robots.end()) {
-               number_of_separators++;
+               number_of_loopclosures++;
                if (aggregated_outliers_keys.find(std::make_pair(pose3_between->key1(), pose3_between->key2())) != aggregated_outliers_keys.end()) {
                   number_of_outliers_not_rejected++;
                }
@@ -529,17 +529,17 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
                                                          (bool) debug_level_);
 
       // Gather info on outliers rejection
-      double total_number_of_separators_rejected_on_all_robots = 0;
+      double total_number_of_loopclosures_rejected_on_all_robots = 0;
       for (const auto& i : robots) {
-         std::string separators_rejected_file_name = log_folder_  + std::to_string(i) + "_number_of_separators_rejected.g2o";
-         std::ifstream separators_rejected_file(separators_rejected_file_name);
-         int number_of_separators_rejected  = 0;
-         separators_rejected_file >> number_of_separators_rejected;
-         total_number_of_separators_rejected_on_all_robots += number_of_separators_rejected;
-         separators_rejected_file.close();
+         std::string loopclosures_rejected_file_name = log_folder_  + std::to_string(i) + "_number_of_loopclosures_rejected.g2o";
+         std::ifstream loopclosures_rejected_file(loopclosures_rejected_file_name);
+         int number_of_loopclosures_rejected  = 0;
+         loopclosures_rejected_file >> number_of_loopclosures_rejected;
+         total_number_of_loopclosures_rejected_on_all_robots += number_of_loopclosures_rejected;
+         loopclosures_rejected_file.close();
       }
-      total_number_of_separators_rejected_on_all_robots /= 2;
-      number_of_separators /= 2;
+      total_number_of_loopclosures_rejected_on_all_robots /= 2;
+      number_of_loopclosures /= 2;
       auto inliers_outliers_added = CountInliersAndOutliers(robots);
       number_of_outliers_not_rejected /= 2;
 
@@ -547,7 +547,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
       std::ofstream error_file;
       error_file.open(error_file_name_, std::ios::out | std::ios::app);
       auto number_of_poses = optimizer_->numberOfPosesInCurrentEstimate();
-      error_file << robots.size() << "\t" << number_of_poses << "\t" << number_of_separators << "\t" << outlier_period_ << std::boolalpha 
+      error_file << robots.size() << "\t" << number_of_poses << "\t" << number_of_loopclosures << "\t" << outlier_period_ << std::boolalpha 
                << "\t" << incremental_solving_ << "\t" << rotation_noise_std_ << "\t" << translation_noise_std_ 
                << "\t" << rotation_estimate_change_threshold_ << "\t" << pose_estimate_change_threshold_ 
                << "\t" << optimizer_period_ << "\t" << pcm_threshold_
@@ -555,7 +555,7 @@ bool BuzzSLAMDataset::CompareCentralizedAndDecentralizedError() {
                << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ 
                << "\t" << inliers_outliers_added.first
                << "\t" << inliers_outliers_added.second 
-               << "\t" << total_number_of_separators_rejected_on_all_robots 
+               << "\t" << total_number_of_loopclosures_rejected_on_all_robots 
                << "\t" << number_of_outliers_not_rejected
                << "\n";
       error_file.close();
@@ -745,7 +745,7 @@ void BuzzSLAMDataset::AbortOptimization(const bool& log_info){
       robots.insert(robot_id_);
 
       auto aggregated_outliers_keys = AggregateOutliersKeys(robots);
-      int number_of_separators = 0;
+      int number_of_loopclosures = 0;
       int number_of_outliers_not_rejected = 0;
       for (const auto& i : robots) {
          std::string dataset_file_name = log_folder_  + std::to_string(i) + "_initial.g2o";
@@ -760,7 +760,7 @@ void BuzzSLAMDataset::AbortOptimization(const bool& log_info){
             auto robot_2_id = gtsam::Symbol(pose3_between->key2()).chr();
             if (robot_1_id != robot_2_id) {
                if (robots.find(((int)robot_1_id-97)) != robots.end() && robots.find(((int)robot_2_id-97)) != robots.end()) {
-                  number_of_separators++;
+                  number_of_loopclosures++;
                   if (aggregated_outliers_keys.find(std::make_pair(pose3_between->key1(), pose3_between->key2())) != aggregated_outliers_keys.end()) {
                      number_of_outliers_not_rejected++;
                   }
@@ -771,17 +771,17 @@ void BuzzSLAMDataset::AbortOptimization(const bool& log_info){
       }
 
       // Gather info on outliers rejection
-      double total_number_of_separators_rejected_on_all_robots = 0;
+      double total_number_of_loopclosures_rejected_on_all_robots = 0;
       for (const auto& i : robots) {
-         std::string separators_rejected_file_name = log_folder_  + std::to_string(i) + "_number_of_separators_rejected.g2o";
-         std::ifstream separators_rejected_file(separators_rejected_file_name);
-         int number_of_separators_rejected  = 0;
-         separators_rejected_file >> number_of_separators_rejected;
-         total_number_of_separators_rejected_on_all_robots += number_of_separators_rejected;
-         separators_rejected_file.close();
+         std::string loopclosures_rejected_file_name = log_folder_  + std::to_string(i) + "_number_of_loopclosures_rejected.g2o";
+         std::ifstream loopclosures_rejected_file(loopclosures_rejected_file_name);
+         int number_of_loopclosures_rejected  = 0;
+         loopclosures_rejected_file >> number_of_loopclosures_rejected;
+         total_number_of_loopclosures_rejected_on_all_robots += number_of_loopclosures_rejected;
+         loopclosures_rejected_file.close();
       }
-      total_number_of_separators_rejected_on_all_robots /= 2;
-      number_of_separators /= 2;
+      total_number_of_loopclosures_rejected_on_all_robots /= 2;
+      number_of_loopclosures /= 2;
       auto inliers_outliers_added = CountInliersAndOutliers(robots);
 
       // Write results to csv
@@ -797,7 +797,7 @@ void BuzzSLAMDataset::AbortOptimization(const bool& log_info){
                << "\t" << current_rotation_iteration_ << "\t" << current_pose_iteration_ 
                << "\t" << inliers_outliers_added.first
                << "\t" << inliers_outliers_added.second 
-               << "\t" << std::round(total_number_of_separators_rejected_on_all_robots) 
+               << "\t" << std::round(total_number_of_loopclosures_rejected_on_all_robots) 
                << "\t" << number_of_outliers_not_rejected
                << "\n";
       error_file.close();
